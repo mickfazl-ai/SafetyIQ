@@ -281,7 +281,7 @@ function SettingsPage({ onBack }) {
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
   const [openId, setOpenId] = useState(null);
-  const appUrl = "https://safety-iq.vercel.app";
+  const appUrl = "https://safety-iq.app";
 
   useEffect(() => { loadCompanies(); }, []);
 
@@ -315,40 +315,96 @@ function SettingsPage({ onBack }) {
 
   function printQR(co) {
     const url = appUrl;
-    const w = window.open("","_blank","width=800,height=700");
+    const qrUrl = `https://chart.googleapis.com/chart?chs=220x220&cht=qr&chl=${encodeURIComponent(url)}&choe=UTF-8`;
+    const w = window.open("","_blank","width=850,height=900");
     w.document.write(`<html><head><style>
-      body{font-family:Arial,sans-serif;text-align:center;padding:40px;background:#fff}
-      h1{font-size:32px;color:#1F2937;margin-bottom:4px}
-      .pin{font-size:56px;font-weight:900;letter-spacing:12px;color:#2563EB;margin:24px 0;background:#EFF6FF;padding:20px 32px;border-radius:16px;display:inline-block}
-      .steps{text-align:left;max-width:420px;margin:24px auto;background:#F9FAFB;border-radius:12px;padding:20px 24px}
-      .steps li{margin-bottom:10px;font-size:16px;line-height:1.5}
-      .url{font-size:15px;color:#6B7280;margin:8px 0 4px}
-      .co{font-size:20px;font-weight:700;color:#2563EB;margin-bottom:8px}
-      @media print{.noprint{display:none}}
+      *{box-sizing:border-box;margin:0;padding:0}
+      body{font-family:Arial,sans-serif;background:#fff;color:#1F2937}
+      .page{max-width:680px;margin:0 auto;padding:40px 32px}
+      .top{display:flex;align-items:center;justify-content:space-between;padding-bottom:20px;border-bottom:3px solid #2563EB;margin-bottom:28px}
+      .brand{display:flex;align-items:center;gap:14px}
+      .brand-name{font-size:32px;font-weight:900;line-height:1}
+      .brand-tag{font-size:13px;color:#6B7280;margin-top:4px;letter-spacing:1px}
+      .company{font-size:22px;font-weight:700;color:#2563EB;text-align:right}
+      .company-sub{font-size:13px;color:#9CA3AF;text-align:right;margin-top:2px}
+      .main{display:flex;gap:32px;align-items:flex-start;margin-bottom:28px}
+      .qr-box{flex-shrink:0;text-align:center}
+      .qr-box img{border:3px solid #E5E7EB;border-radius:12px;display:block}
+      .qr-label{font-size:12px;color:#9CA3AF;margin-top:6px}
+      .right{flex:1}
+      .instruction{font-size:15px;color:#374151;margin-bottom:16px;line-height:1.5}
+      .pin-box{background:#EFF6FF;border:2px solid #BFDBFE;border-radius:16px;padding:20px 24px;text-align:center;margin-bottom:20px}
+      .pin-label{font-size:13px;color:#6B7280;font-weight:600;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
+      .pin{font-size:52px;font-weight:900;color:#2563EB;letter-spacing:14px;line-height:1}
+      .steps{background:#F9FAFB;border-radius:12px;padding:18px 20px}
+      .steps-title{font-size:14px;font-weight:700;margin-bottom:10px;color:#374151}
+      .steps ol{padding-left:20px}
+      .steps li{font-size:14px;line-height:1.6;color:#374151;margin-bottom:4px}
+      .steps li strong{color:#2563EB}
+      .footer{border-top:1px solid #E5E7EB;padding-top:16px;display:flex;justify-content:space-between;align-items:center}
+      .footer-url{font-size:14px;font-weight:700;color:#2563EB}
+      .footer-note{font-size:12px;color:#9CA3AF}
+      .noprint{margin-top:24px;text-align:center}
+      @media print{.noprint{display:none}body{padding:0}.page{padding:24px 20px}}
     </style></head><body>
-      <svg width="72" height="72" viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg" style="margin-bottom:8px">
-        <path d="M8 3.5L36 3.5Q42 3.5 42 9.5L42 25Q42 39 22 43Q2 39 2 25L2 9.5Q2 3.5 8 3.5Z" fill="#2563EB"/>
-        <path d="M11 7L33 7Q38.5 7 38.5 12.5L38.5 24.5Q38.5 36 22 39.5Q5.5 36 5.5 24.5L5.5 12.5Q5.5 7 11 7Z" fill="#1D4ED8"/>
-        <path d="M13 22L19.5 29.5L31 15" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
-        <rect x="12" y="34" width="20" height="8" rx="3" fill="#F59E0B"/>
-        <text x="22" y="40.5" text-anchor="middle" style="fill:#fff;font-size:6px;font-weight:700;font-family:Arial">IQ</text>
-      </svg>
-      <h1>Safety<span style="color:#2563EB">IQ</span></h1>
-      <div class="co">${co.name}</div>
-      <div class="url">Open your browser and go to:</div>
-      <div style="font-size:18px;font-weight:700;color:#1F2937;margin-bottom:16px">${url}</div>
-      <div style="font-size:15px;color:#374151;margin-bottom:4px">Enter your site PIN:</div>
-      <div class="pin">${co.pin}</div>
+    <div class="page">
+      <div class="top">
+        <div class="brand">
+          <svg width="56" height="56" viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
+            <path d="M8 3.5L36 3.5Q42 3.5 42 9.5L42 25Q42 39 22 43Q2 39 2 25L2 9.5Q2 3.5 8 3.5Z" fill="#2563EB"/>
+            <path d="M11 7L33 7Q38.5 7 38.5 12.5L38.5 24.5Q38.5 36 22 39.5Q5.5 36 5.5 24.5L5.5 12.5Q5.5 7 11 7Z" fill="#1D4ED8"/>
+            <path d="M13 22L19.5 29.5L31 15" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <rect x="12" y="34" width="20" height="8" rx="3" fill="#F59E0B"/>
+            <text x="22" y="40.5" text-anchor="middle" style="fill:#fff;font-size:6px;font-weight:700;font-family:Arial">IQ</text>
+          </svg>
+          <div>
+            <div class="brand-name">Safety<span style="color:#2563EB">IQ</span></div>
+            <div class="brand-tag">STOP · THINK · ACT SAFELY</div>
+          </div>
+        </div>
+        <div>
+          <div class="company">${co.name}</div>
+          <div class="company-sub">Site access poster</div>
+        </div>
+      </div>
+
+      <div class="main">
+        <div class="qr-box">
+          <img src="${qrUrl}" width="220" height="220" alt="QR Code">
+          <div class="qr-label">Scan to open app</div>
+        </div>
+        <div class="right">
+          <div class="instruction">Scan the QR code with your phone camera, or type the address below into your browser:</div>
+          <div style="font-size:18px;font-weight:800;color:#1F2937;background:#F3F4F6;padding:10px 14px;border-radius:8px;margin-bottom:20px;text-align:center">${url}</div>
+          <div class="pin-box">
+            <div class="pin-label">Your site PIN</div>
+            <div class="pin">${co.pin}</div>
+          </div>
+        </div>
+      </div>
+
       <div class="steps">
-        <strong style="font-size:16px">How to access:</strong>
-        <ol style="margin-top:10px">
-          <li>Open your phone browser</li>
-          <li>Go to <strong>${url}</strong></li>
-          <li>Enter the 6-digit PIN above</li>
-          <li>Complete your Take 5 before starting work</li>
+        <div class="steps-title">How to complete your Take 5:</div>
+        <ol>
+          <li>Scan the QR code or go to <strong>${url}</strong></li>
+          <li>Enter your 6-digit site PIN: <strong>${co.pin}</strong></li>
+          <li>Complete the pre-task checklist (Step 1)</li>
+          <li>Identify all hazards (Step 2)</li>
+          <li>Assess risk level — SWMS will be triggered if required (Step 3)</li>
+          <li>Complete SWMS if required (Step 4)</li>
+          <li>Sign off and proceed safely (Step 5)</li>
         </ol>
       </div>
-      <button class="noprint" onclick="window.print()" style="margin-top:16px;padding:14px 32px;background:#2563EB;color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer">🖨 Print this poster</button>
+
+      <div class="footer">
+        <div class="footer-url">${url}</div>
+        <div class="footer-note">PIN: ${co.pin} &nbsp;|&nbsp; ${co.name} &nbsp;|&nbsp; SafetyIQ</div>
+      </div>
+
+      <div class="noprint">
+        <button onclick="window.print()" style="padding:14px 40px;background:#2563EB;color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer">🖨 Print poster</button>
+      </div>
+    </div>
     </body></html>`);
     w.document.close();
   }
