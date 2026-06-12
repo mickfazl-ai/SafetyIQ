@@ -507,13 +507,35 @@ function MasterAdmin({ onLogout }) {
   }
 
   async function deleteCompany(co) {
-    const c1 = confirm(`Are you sure you want to delete "${co.name}"?\n\nThis will permanently remove the company and their PIN.\n\nWorkers will no longer be able to log in.`);
+    const c1 = confirm(`Are you sure you want to delete "${co.name}"?\n\nBefore deletion, all records will be exported as a PDF for your records.\n\nWorkers will no longer be able to log in with this PIN.`);
     if (!c1) return;
-    const c2 = confirm(`FINAL CONFIRMATION\n\nDelete "${co.name}" permanently?\n\nThis cannot be undone.`);
+    const c2 = confirm(`FINAL CONFIRMATION\n\nDelete "${co.name}" permanently?\n\nThis will:\n• Export all ${allRecords.filter(r=>r.company_id===co.id).length} records to PDF\n• Permanently delete the company\n\nThis cannot be undone.`);
     if (!c2) return;
-    const { error } = await supabase.from("companies").delete().eq("id",co.id);
-    if (error) setMsg("Error: "+error.message);
-    else { setMsg(`"${co.name}" deleted.`); setOpenId(null); loadAll(); }
+
+    // Step 1: Export all records first
+    const recs = allRecords.filter(r=>r.company_id===co.id);
+    if (recs.length > 0) {
+      setMsg(`Exporting ${recs.length} records before deletion...`);
+      const w = window.open("","_blank","width=900,height=700");
+      if (w) {
+        w.document.write(buildBulkPDF(recs, co.name + " — FINAL EXPORT BEFORE DELETION"));
+        w.document.close();
+        setTimeout(()=>w.print(), 600);
+      }
+      // Wait a moment to let export open
+      await new Promise(r => setTimeout(r, 1500));
+    }
+
+    // Step 2: Delete the company
+    setMsg(`Deleting "${co.name}"...`);
+    const { error } = await supabase.from("companies").delete().eq("id", co.id);
+    if (error) {
+      setMsg("Error deleting company: " + error.message);
+    } else {
+      setMsg(`"${co.name}" deleted successfully. ${recs.length} records were exported.`);
+      setOpenId(null);
+      loadAll();
+    }
   }
 
   async function toggleActive(co) {
