@@ -445,7 +445,7 @@ function SettingsPage({ onBack }) {
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
   const [openId, setOpenId] = useState(null);
-  const appUrl = "https://safety-iq.app";
+  const appUrl = "https://safety-iq.vercel.app";
 
   useEffect(() => { loadCompanies(); }, []);
 
@@ -781,7 +781,7 @@ function RecordsView({ companyId, companyName, onBack, onNew }) {
 }
 
 // ── MAIN TAKE 5 APP ───────────────────────────────────────────────────────────
-function Take5App({ company, onExit }) {
+function Take5App({ company, onExit, onForgetDevice }) {
   const [screen, setScreen] = useState("setup");
   const [form, setForm] = useState({ jobRef:"", location:"", date:new Date().toISOString().slice(0,10), time:new Date().toTimeString().slice(0,5), task:"", machineEquipment:"" });
   const [step1, setStep1] = useState({});
@@ -892,7 +892,10 @@ function Take5App({ company, onExit }) {
         <div style={{marginTop:10}}><label style={S.label}>Time</label><input style={{...S.input,maxWidth:160}} type="time" value={form.time} onChange={setF("time")} /></div>
       </div>
       <button style={S.btnPrim} onClick={()=>setScreen("step1")}>Start Take 5 →</button>
-      <button style={{...S.btnSec,width:"100%",textAlign:"center",marginTop:8}} onClick={onExit}>← Exit</button>
+      <div style={{display:"flex",gap:8,marginTop:8}}>
+        <button style={{...S.btnSec,flex:3,textAlign:"center"}} onClick={onExit}>← Exit</button>
+        <button style={{...S.btnSec,flex:2,textAlign:"center",fontSize:12,color:"#EF4444",borderColor:"#FCA5A5"}} onClick={()=>{ if(confirm("Sign out and forget this device? You will need to enter the PIN again next time.")) onForgetDevice(); }}>🔓 Sign out</button>
+      </div>
     </div>
   );
 
@@ -1275,20 +1278,68 @@ function buildPDF(rec, companyName) {
 
 // ── ROOT ──────────────────────────────────────────────────────────────────────
 export default function App() {
-  const [mode, setMode] = useState("pin");
+  const [mode, setMode] = useState("loading");
   const [company, setCompany] = useState(null);
   const [adminSession, setAdminSession] = useState(null);
 
   useEffect(()=>{
+    // Check for saved company PIN in localStorage (phone remembered)
+    const saved = localStorage.getItem("safetyiq_company");
+    if (saved) {
+      try {
+        const co = JSON.parse(saved);
+        // Verify the company still exists in DB
+        supabase.from("companies").select("id,name").eq("id", co.company_id).eq("is_active", true).single()
+          .then(({ data }) => {
+            if (data) { setCompany({ company_id:data.id, company_name:data.name }); setMode("app"); }
+            else { localStorage.removeItem("safetyiq_company"); setMode("pin"); }
+          });
+      } catch(e) { localStorage.removeItem("safetyiq_company"); setMode("pin"); }
+    } else {
+      setMode("pin");
+    }
+
+    // Check for admin session
     supabase.auth.getSession().then(({data})=>{ if(data.session){ setAdminSession(data.session); setMode("admin"); } });
-    const { data:{subscription} } = supabase.auth.onAuthStateChange((_e,s)=>{ setAdminSession(s); if(s) setMode("admin"); else { setAdminSession(null); setMode("pin"); } });
+    const { data:{subscription} } = supabase.auth.onAuthStateChange((_e,s)=>{
+      setAdminSession(s);
+      if(s) setMode("admin");
+      else { setAdminSession(null); }
+    });
     return ()=>subscription.unsubscribe();
   },[]);
 
-  if (mode==="pin") return <PinLogin onSuccess={co=>{ setCompany(co); setMode("app"); }} onAdminClick={()=>setMode("adminLogin")} />;
+  function handlePinSuccess(co) {
+    setCompany(co);
+    // Save to localStorage so phone remembers
+    localStorage.setItem("safetyiq_company", JSON.stringify(co));
+    setMode("app");
+  }
+
+  function handleExit() {
+    // Don't clear localStorage — phone stays signed in
+    setMode("pin");
+  }
+
+  function handleForgetDevice() {
+    localStorage.removeItem("safetyiq_company");
+    setCompany(null);
+    setMode("pin");
+  }
+
+  if (mode==="loading") return (
+    <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", background:"#F9FAFB" }}>
+      <div style={{ textAlign:"center" }}>
+        <Logo size={64} />
+        <div style={{ fontSize:14, color:"#9CA3AF", marginTop:12 }}>Loading...</div>
+      </div>
+    </div>
+  );
+
+  if (mode==="pin") return <PinLogin onSuccess={handlePinSuccess} onAdminClick={()=>setMode("adminLogin")} />;
   if (mode==="adminLogin") return <AdminLogin onSuccess={s=>{ setAdminSession(s); setMode("admin"); }} onBack={()=>setMode("pin")} />;
-  if (mode==="admin") return <AdminDashboard onBack={()=>setMode("pin")} onSettings={()=>setMode("settings")} onLogout={async()=>{ await supabase.auth.signOut(); setMode("pin"); }} />;
+  if (mode==="admin") return <AdminDashboard onBack={()=>{ const saved=localStorage.getItem("safetyiq_company"); if(saved){try{setCompany(JSON.parse(saved));setMode("app");}catch(e){setMode("pin");}}else{setMode("pin");} }} onSettings={()=>setMode("settings")} onLogout={async()=>{ await supabase.auth.signOut(); setMode("pin"); }} />;
   if (mode==="settings") return <SettingsPage onBack={()=>setMode("admin")} />;
-  if (mode==="app"&&company) return <Take5App company={company} onExit={()=>setMode("pin")} />;
+  if (mode==="app"&&company) return <Take5App company={company} onExit={handleExit} onForgetDevice={handleForgetDevice} />;
   return null;
 }
