@@ -1,9 +1,41 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const SUPABASE_URL = "https://wwaogpobcnqqxzicjzon.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind3YW9ncG9iY25xcXh6aWNqem9uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwNTQ5ODQsImV4cCI6MjA5NjYzMDk4NH0.eF57eCwnaHUvvAgI9yfO9auAyKTC-C17qZeh_t7GPaQ";
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// Load qrcode library from CDN
+let QRCodeLib = null;
+async function getQRLib() {
+  if (QRCodeLib) return QRCodeLib;
+  return new Promise((resolve) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+    s.onload = () => { QRCodeLib = window.QRCode; resolve(window.QRCode); };
+    s.onerror = () => resolve(null);
+    document.head.appendChild(s);
+  });
+}
+
+async function generateQRDataURL(text, size=220) {
+  try {
+    // Use canvas-based generation
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    // Use qrcode-generator CDN
+    const QR = await new Promise((resolve) => {
+      if (window.qrcode) { resolve(window.qrcode); return; }
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+      s.onload = () => resolve(null);
+      s.onerror = () => resolve(null);
+      document.head.appendChild(s);
+    });
+    return null;
+  } catch(e) { return null; }
+}
 
 // ── Step 1: Pre-task checklist ────────────────────────────────────────────────
 const STEP1_CHECKS = [
@@ -201,6 +233,63 @@ const S = {
   divider:  { fontSize:11, fontWeight:700, color:"#9CA3AF", textTransform:"uppercase", letterSpacing:".06em", padding:"8px 0 4px", borderBottom:"1px solid #E5E7EB", marginBottom:10, marginTop:16 },
 };
 
+
+// ── QR Code Component ─────────────────────────────────────────────────────────
+function QRCanvas({ text, size=220 }) {
+  const ref = useRef(null);
+  const [done, setDone] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    if (!ref.current || !text) return;
+    ref.current.innerHTML = '';
+    
+    function tryMake() {
+      try {
+        new window.QRCode(ref.current, {
+          text: text,
+          width: size,
+          height: size,
+          colorDark: '#000000',
+          colorLight: '#ffffff',
+          correctLevel: window.QRCode.CorrectLevel.M
+        });
+        setDone(true);
+      } catch(e) {
+        setFailed(true);
+      }
+    }
+
+    if (window.QRCode) {
+      tryMake();
+    } else {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+      s.onload = () => tryMake();
+      s.onerror = () => setFailed(true);
+      document.head.appendChild(s);
+    }
+  }, [text, size]);
+
+  if (failed) return (
+    <div style={{ width:size, height:size, border:'2px dashed #E5E7EB', borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background:'#F9FAFB', flexDirection:'column', gap:8 }}>
+      <div style={{ fontSize:12, color:'#9CA3AF', textAlign:'center', padding:'0 12px' }}>QR unavailable offline</div>
+      <div style={{ fontSize:11, color:'#2563EB', textAlign:'center', wordBreak:'break-all', padding:'0 8px' }}>{text}</div>
+    </div>
+  );
+
+  return (
+    <div style={{ position:'relative' }}>
+      <div ref={ref} style={{ width:size, height:size, borderRadius:8, overflow:'hidden', border:'2px solid #E5E7EB' }}></div>
+      {!done && (
+        <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', background:'#F9FAFB', borderRadius:8 }}>
+          <div style={{ fontSize:12, color:'#9CA3AF' }}>Generating QR...</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Logo ──────────────────────────────────────────────────────────────────────
 function Logo({ size=44 }) {
   const s = size;
@@ -389,25 +478,67 @@ function SettingsPage({ onBack }) {
   function printQR(co) {
     const url = appUrl;
     const w = window.open("","_blank","width=850,height=900");
-    const qrScript = `<script>var QRCode=function(){function a(a){this.mode=4;this.data=a;this.parsedData=[];for(var b=[],d=0,e=a.length;d<e;d++){var f=a.charCodeAt(d);if(f>65536){b[0]=240|(f>>>18);b[1]=128|(f>>>12&63);b[2]=128|(f>>>6&63);b[3]=128|(63&f)}else if(f>2048){b[0]=224|(f>>>12);b[1]=128|(f>>>6&63);b[2]=128|(63&f)}else if(f>128){b[0]=192|(f>>>6);b[1]=128|(63&f)}else{b[0]=f}this.parsedData=this.parsedData.concat(b)}if(this.parsedData.length!=a.length){this.parsedData.unshift(191);this.parsedData.unshift(187);this.parsedData.unshift(239)}}a.prototype={getLength:function(){return this.parsedData.length},write:function(a){for(var b=0;b<this.parsedData.length;b++)a.put(this.parsedData[b],8)}};function b(a,b){this.typeNumber=a;this.errorCorrectLevel=b;this.modules=null;this.moduleCount=0;this.dataCache=null;this.dataList=[]}b.prototype={addData:function(b){this.dataList.push(new a(b));this.dataCache=null},isDark:function(a,b){return this.modules[a][b]},getModuleCount:function(){return this.moduleCount},make:function(){var a=0;for(var c=0;c<8;c++){this.makeImpl(true,c);var d=getLostPoint(this);if(c==0||a>d){a=d;var e=c}}this.makeImpl(false,e)},makeImpl:function(a,c){this.moduleCount=4*this.typeNumber+17;this.modules=[];for(var d=0;d<this.moduleCount;d++){this.modules[d]=[];for(var e=0;e<this.moduleCount;e++)this.modules[d][e]=null}this.setupPositionProbePattern(0,0);this.setupPositionProbePattern(this.moduleCount-7,0);this.setupPositionProbePattern(0,this.moduleCount-7);this.setupTimingPattern();this.setupTypeInfo(a,c);if(null==this.dataCache)this.dataCache=createData(this.typeNumber,this.errorCorrectLevel,this.dataList);this.mapData(this.dataCache,c)},setupPositionProbePattern:function(a,b){for(var c=-1;c<=7;c++){if(a+c<0||this.moduleCount<=a+c)continue;for(var d=-1;d<=7;d++){if(b+d<0||this.moduleCount<=b+d)continue;this.modules[a+c][b+d]=(c>=0&&c<=6&&(d==0||d==6))||(d>=0&&d<=6&&(c==0||c==6))||(c>=2&&c<=4&&d>=2&&d<=4)}}},setupTimingPattern:function(){for(var a=8;a<this.moduleCount-8;a++)if(null==this.modules[a][6])this.modules[a][6]=(a%2==0);for(var b=8;b<this.moduleCount-8;b++)if(null==this.modules[6][b])this.modules[6][b]=(b%2==0)},setupTypeInfo:function(a,b){var c=(1<<3)|b;var d=getBCHTypeInfo(c);for(var e=0;e<15;e++){var f=!a&&((d>>e)&1)==1;if(e<6)this.modules[e][8]=f;else if(e<7)this.modules[e+1][8]=f;else this.modules[this.moduleCount-15+e][8]=f}for(var g=0;g<15;g++){var h=!a&&((d>>g)&1)==1;if(g<8)this.modules[8][this.moduleCount-g-1]=h;else if(g<9)this.modules[8][15-g-1+1]=h;else this.modules[8][15-g-1]=h}this.modules[this.moduleCount-8][8]=!a},mapData:function(a,b){var c=-1;var d=this.moduleCount-1;var e=7;var f=0;for(var g=this.moduleCount-1;g>0;g-=2){if(g==6)g--;for(;;){for(var h=0;h<2;h++){if(null==this.modules[d][g-h]){var i=false;if(f<a.length)i=((a[f]>>e)&1)==1;if(getMask(b,d,g-h))i=!i;this.modules[d][g-h]=i;e--;if(e==-1){f++;e=7}}}d+=c;if(d<0||this.moduleCount<=d){d-=c;c=-c;break}}}}};function getLostPoint(a){var b=a.getModuleCount();var c=0;for(var d=0;d<b;d++){for(var e=0;e<b;e++){var f=0;var g=a.isDark(d,e);for(var h=-1;h<=1;h++){if(d+h<0||b<=d+h)continue;for(var i=-1;i<=1;i++){if(e+i<0||b<=e+i)continue;if(h==0&&i==0)continue;if(g==a.isDark(d+h,e+i))f++}}if(f>5)c+=3+f-5}}return c}function getMask(a,b,c){switch(a){case 0:return(b+c)%2==0;case 1:return b%2==0;case 2:return c%3==0;case 3:return(b+c)%3==0;case 4:return(Math.floor(b/2)+Math.floor(c/3))%2==0;case 5:return b*c%2+b*c%3==0;case 6:return(b*c%2+b*c%3)%2==0;case 7:return(b*c%3+(b+c)%2)%2==0}}function getBCHTypeInfo(a){var b=a<<10;while(getBCHDigit(b)-getBCHDigit(1335)>=0)b^=1335<<getBCHDigit(b)-getBCHDigit(1335);return(a<<10|b)^21522}function getBCHDigit(a){var b=0;while(a!=0){b++;a>>>=1}return b}function createData(a,b,c){var d=getRSBlocks(a,b);var e=new BitBuffer();for(var f=0;f<c.length;f++){var g=c[f];e.put(g.mode,4);e.put(g.getLength(),8);g.write(e)}var h=0;for(var i=0;i<d.length;i++)h+=d[i].dataCount;if(e.getLengthInBits()>8*h)throw new Error("overflow");if(e.getLengthInBits()+4<=8*h)e.put(0,4);while(e.getLengthInBits()%8!=0)e.putBit(false);while(true){if(e.getLengthInBits()>=8*h)break;e.put(236,8);if(e.getLengthInBits()>=8*h)break;e.put(17,8)}return createBytes(e,d)}function createBytes(a,b){var c=0,d=0,e=0;var f=[];var g=[];for(var h=0;h<b.length;h++){var i=b[h].dataCount;var j=b[h].totalCount-i;d=Math.max(d,i);e=Math.max(e,j);f[h]=new Array(i);for(var k=0;k<f[h].length;k++)f[h][k]=255&a.buffer[c++];g[h]=new Array(j);for(var l=0;l<g[h].length;l++)g[h][l]=0}var m=[];for(var n=0;n<b.length;n++){var o=getECP(b[n].totalCount-b[n].dataCount);var p=new Poly(f[n],o.getLength()-1);var q=p.mod(o);m[n]=new Array(b[n].totalCount-b[n].dataCount);for(var r=0;r<m[n].length;r++){var s=r+q.getLength()-m[n].length;m[n][r]=s>=0?q.get(s):0}}var t=new Array(b.reduce(function(a,b){return a+b.totalCount},0));var u=0;for(var v=0;v<d;v++)for(var w=0;w<b.length;w++)if(v<f[w].length)t[u++]=f[w][v];for(var x=0;x<e;x++)for(var y=0;y<b.length;y++)if(x<g[y].length)t[u++]=g[y][x];for(var z=0;z<m[0].length;z++)for(var A=0;A<b.length;A++)t[u++]=m[A][z];return t}var EXP=[],LOG=[];for(var i=0;i<8;i++)EXP[i]=1<<i;for(var i=8;i<256;i++)EXP[i]=EXP[i-4]^EXP[i-5]^EXP[i-6]^EXP[i-8];for(var i=0;i<255;i++)LOG[EXP[i]]=i;function gexp(a){while(a<0)a+=255;while(a>=256)a-=255;return EXP[a]}function glog(a){return LOG[a]}function getECP(a){var b=new Poly([1],0);for(var c=0;c<a;c++)b=b.multiply(new Poly([1,gexp(c)],0));return b}function Poly(a,b){var c=0;while(c<a.length&&a[c]==0)c++;this.num=new Array(a.length-c+b);for(var d=0;d<a.length-c;d++)this.num[d]=a[d+c]}Poly.prototype={get:function(a){return this.num[a]},getLength:function(){return this.num.length},multiply:function(a){var b=new Array(this.getLength()+a.getLength()-1);for(var c=0;c<this.getLength();c++)for(var d=0;d<a.getLength();d++)b[c+d]^=gexp(glog(this.get(c))+glog(a.get(d)));return new Poly(b,0)},mod:function(a){if(this.getLength()-a.getLength()<0)return this;var b=glog(this.get(0))-glog(a.get(0));var c=this.num.slice();for(var d=0;d<a.getLength();d++)c[d]^=gexp(glog(a.get(d))+b);return new Poly(c,0).mod(a)}};function BitBuffer(){this.buffer=[];this.length=0}BitBuffer.prototype={put:function(a,b){for(var c=0;c<b;c++)this.putBit(((a>>>(b-c-1))&1)==1)},getLengthInBits:function(){return this.length},putBit:function(a){var b=Math.floor(this.length/8);if(this.buffer.length<=b)this.buffer.push(0);if(a)this.buffer[b]|=128>>>(this.length%8);this.length++}};function RSBlock(a,b){this.totalCount=a;this.dataCount=b}var RST=[[1,26,19],[1,26,16],[1,26,13],[1,26,9],[1,44,34],[1,44,28],[1,44,22],[1,44,16],[1,70,55],[1,70,44],[2,35,17],[2,35,13],[1,100,80],[2,50,32],[2,50,24],[4,25,9],[1,134,108],[2,67,43],[2,33,15,2,34,16],[2,33,11,2,34,12]];function getRSBlocks(a,b){var c=RST[(a-1)*4+(b==1?0:1)];if(!c)throw new Error("bad rs");var d=c.length/3;var e=[];for(var f=0;f<d;f++)for(var g=c[3*f],h=c[3*f+1],i=c[3*f+2],j=0;j<g;j++)e.push(new RSBlock(h,i));return e}window.makeQR=function(text,size){try{var qr=new b(4,1);qr.addData(text);qr.make();var n=qr.getModuleCount();var cv=document.createElement("canvas");cv.width=cv.height=size;var ctx=cv.getContext("2d");ctx.fillStyle="#fff";ctx.fillRect(0,0,size,size);ctx.fillStyle="#000";var s=size/n;for(var r=0;r<n;r++)for(var c2=0;c2<n;c2++)if(qr.isDark(r,c2))ctx.fillRect(Math.round(c2*s),Math.round(r*s),Math.ceil(s),Math.ceil(s));return cv.toDataURL()}catch(e){return null}};<\/script>`;
-    w.document.write(`<html><head><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;background:#fff;color:#1F2937}.page{max-width:680px;margin:0 auto;padding:40px 32px}.top{display:flex;align-items:center;justify-content:space-between;padding-bottom:20px;border-bottom:3px solid #2563EB;margin-bottom:28px}.brand{display:flex;align-items:center;gap:14px}.brand-name{font-size:32px;font-weight:900}.brand-tag{font-size:13px;color:#6B7280;margin-top:4px;letter-spacing:1px}.co-name{font-size:22px;font-weight:700;color:#2563EB;text-align:right}.co-sub{font-size:13px;color:#9CA3AF;text-align:right;margin-top:2px}.main{display:flex;gap:32px;align-items:flex-start;margin-bottom:28px}.qr-box{flex-shrink:0;text-align:center}.qr-label{font-size:12px;color:#9CA3AF;margin-top:6px}.right{flex:1}.pin-box{background:#EFF6FF;border:2px solid #BFDBFE;border-radius:16px;padding:20px 24px;text-align:center;margin-bottom:20px}.pin-label{font-size:13px;color:#6B7280;font-weight:600;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}.pin{font-size:52px;font-weight:900;color:#2563EB;letter-spacing:14px;line-height:1}.url-box{font-size:18px;font-weight:800;color:#1F2937;background:#F3F4F6;padding:10px 14px;border-radius:8px;margin-bottom:20px;text-align:center}.steps{background:#F9FAFB;border-radius:12px;padding:18px 20px}.steps-title{font-size:14px;font-weight:700;margin-bottom:10px}.steps ol{padding-left:20px}.steps li{font-size:14px;line-height:1.6;margin-bottom:4px}.footer{border-top:1px solid #E5E7EB;padding-top:16px;margin-top:20px;display:flex;justify-content:space-between;align-items:center}.footer-url{font-size:14px;font-weight:700;color:#2563EB}.footer-note{font-size:12px;color:#9CA3AF}.noprint{margin-top:24px;text-align:center}@media print{.noprint{display:none}}</style>${qrScript}</head><body>
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
+      *{box-sizing:border-box;margin:0;padding:0}
+      body{font-family:Arial,sans-serif;background:#fff;color:#1F2937}
+      .page{max-width:680px;margin:0 auto;padding:40px 32px}
+      .top{display:flex;align-items:center;justify-content:space-between;padding-bottom:20px;border-bottom:3px solid #2563EB;margin-bottom:28px}
+      .brand{display:flex;align-items:center;gap:14px}
+      .brand-name{font-size:32px;font-weight:900}
+      .brand-tag{font-size:13px;color:#6B7280;margin-top:4px;letter-spacing:1px}
+      .co-name{font-size:22px;font-weight:700;color:#2563EB;text-align:right}
+      .co-sub{font-size:13px;color:#9CA3AF;text-align:right;margin-top:2px}
+      .main{display:flex;gap:32px;align-items:flex-start;margin-bottom:28px}
+      .qr-wrap{flex-shrink:0;text-align:center}
+      .qr-wrap #qr-div{border:3px solid #E5E7EB;border-radius:12px;overflow:hidden;width:220px;height:220px;display:inline-block}
+      .qr-label{font-size:12px;color:#9CA3AF;margin-top:6px}
+      .right{flex:1}
+      .url-box{font-size:18px;font-weight:800;background:#F3F4F6;padding:10px 14px;border-radius:8px;margin-bottom:20px;text-align:center;word-break:break-all}
+      .pin-box{background:#EFF6FF;border:2px solid #BFDBFE;border-radius:16px;padding:20px 24px;text-align:center;margin-bottom:20px}
+      .pin-label{font-size:13px;color:#6B7280;font-weight:600;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
+      .pin{font-size:52px;font-weight:900;color:#2563EB;letter-spacing:14px;line-height:1}
+      .steps{background:#F9FAFB;border-radius:12px;padding:18px 20px;margin-bottom:20px}
+      .steps-title{font-size:14px;font-weight:700;margin-bottom:10px}
+      .steps ol{padding-left:20px}
+      .steps li{font-size:14px;line-height:1.6;margin-bottom:4px}
+      .footer{border-top:1px solid #E5E7EB;padding-top:16px;display:flex;justify-content:space-between;align-items:center}
+      .footer-url{font-size:14px;font-weight:700;color:#2563EB}
+      .footer-note{font-size:12px;color:#9CA3AF}
+      .noprint{margin-top:24px;text-align:center}
+      @media print{.noprint{display:none}}
+    </style></head><body>
     <div class="page">
       <div class="top">
         <div class="brand">
-          <svg width="56" height="56" viewBox="0 0 44 44"><path d="M8 3.5L36 3.5Q42 3.5 42 9.5L42 25Q42 39 22 43Q2 39 2 25L2 9.5Q2 3.5 8 3.5Z" fill="#2563EB"/><path d="M11 7L33 7Q38.5 7 38.5 12.5L38.5 24.5Q38.5 36 22 39.5Q5.5 36 5.5 24.5L5.5 12.5Q5.5 7 11 7Z" fill="#1D4ED8"/><path d="M13 22L19.5 29.5L31 15" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/><rect x="12" y="34" width="20" height="8" rx="3" fill="#F59E0B"/><text x="22" y="40.5" text-anchor="middle" style="fill:#fff;font-size:6px;font-weight:700;font-family:Arial">IQ</text></svg>
-          <div><div class="brand-name">Safety<span style="color:#2563EB">IQ</span></div><div class="brand-tag">STOP · THINK · ACT SAFELY</div></div>
+          <svg width="56" height="56" viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
+            <path d="M8 3.5L36 3.5Q42 3.5 42 9.5L42 25Q42 39 22 43Q2 39 2 25L2 9.5Q2 3.5 8 3.5Z" fill="#2563EB"/>
+            <path d="M11 7L33 7Q38.5 7 38.5 12.5L38.5 24.5Q38.5 36 22 39.5Q5.5 36 5.5 24.5L5.5 12.5Q5.5 7 11 7Z" fill="#1D4ED8"/>
+            <path d="M13 22L19.5 29.5L31 15" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <rect x="12" y="34" width="20" height="8" rx="3" fill="#F59E0B"/>
+            <text x="22" y="40.5" text-anchor="middle" style="fill:#fff;font-size:6px;font-weight:700;font-family:Arial">IQ</text>
+          </svg>
+          <div>
+            <div class="brand-name">Safety<span style="color:#2563EB">IQ</span></div>
+            <div class="brand-tag">STOP &middot; THINK &middot; ACT SAFELY</div>
+          </div>
         </div>
-        <div><div class="co-name">${co.name}</div><div class="co-sub">Site access poster</div></div>
+        <div>
+          <div class="co-name">${co.name}</div>
+          <div class="co-sub">Site access poster</div>
+        </div>
       </div>
       <div class="main">
-        <div class="qr-box">
-          <canvas id="qrc" width="220" height="220" style="border:3px solid #E5E7EB;border-radius:12px;display:block"></canvas>
+        <div class="qr-wrap">
+          <div id="qr-div"></div>
           <div class="qr-label">Scan to open app</div>
         </div>
         <div class="right">
           <p style="font-size:15px;color:#374151;margin-bottom:16px">Scan the QR code or type the address into your browser:</p>
           <div class="url-box">${url}</div>
-          <div class="pin-box"><div class="pin-label">Your site PIN</div><div class="pin">${co.pin}</div></div>
+          <div class="pin-box">
+            <div class="pin-label">Your site PIN</div>
+            <div class="pin">${co.pin}</div>
+          </div>
         </div>
       </div>
       <div class="steps">
@@ -415,19 +546,38 @@ function SettingsPage({ onBack }) {
         <ol>
           <li>Scan the QR code or go to <strong>${url}</strong></li>
           <li>Enter your 6-digit site PIN: <strong>${co.pin}</strong></li>
-          <li>Complete the pre-task checklist</li>
-          <li>Select all High Risk tasks that apply</li>
-          <li>Identify hazards and assess risk</li>
-          <li>Complete SWMS if required — then proceed safely</li>
+          <li>Complete the pre-task checklist (Step 1)</li>
+          <li>Select all High Risk tasks that apply (Step 2)</li>
+          <li>Identify hazards and assess risk (Step 3)</li>
+          <li>Complete SWMS if required (Step 4)</li>
+          <li>Sign off and proceed safely (Step 5)</li>
         </ol>
       </div>
       <div class="footer">
         <div class="footer-url">${url}</div>
-        <div class="footer-note">PIN: ${co.pin} | ${co.name} | SafetyIQ</div>
+        <div class="footer-note">PIN: ${co.pin} &nbsp;|&nbsp; ${co.name} &nbsp;|&nbsp; SafetyIQ</div>
       </div>
-      <div class="noprint"><button onclick="window.print()" style="padding:14px 40px;background:#2563EB;color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer">🖨 Print poster</button></div>
+      <div class="noprint">
+        <button onclick="window.print()" style="padding:14px 40px;background:#2563EB;color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer">&#128424; Print poster</button>
+      </div>
     </div>
-    <script>window.onload=function(){var d=window.makeQR("${url}",220);if(d){var cv=document.getElementById("qrc");var img=new Image();img.onload=function(){cv.getContext("2d").drawImage(img,0,0)};img.src=d}}<\/script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
+    <script>
+      window.onload = function() {
+        try {
+          new QRCode(document.getElementById("qr-div"), {
+            text: "${url}",
+            width: 220,
+            height: 220,
+            colorDark: "#000000",
+            colorLight: "#ffffff",
+            correctLevel: QRCode.CorrectLevel.M
+          });
+        } catch(e) {
+          document.getElementById("qr-div").innerHTML = '<div style="padding:20px;font-size:12px;color:#6B7280;text-align:center">Open browser to view QR</div>';
+        }
+      };
+    <\/script>
     </body></html>`);
     w.document.close();
   }
@@ -453,6 +603,11 @@ function SettingsPage({ onBack }) {
           </div>
           {openId===co.id && (
             <div style={{ marginTop:12, paddingTop:12, borderTop:"1px solid #E5E7EB" }}>
+              <div style={{ display:"flex", flexDirection:"column", alignItems:"center", marginBottom:12 }}>
+                <QRCanvas text={appUrl} size={180} />
+                <div style={{ fontSize:12, color:"#9CA3AF", marginTop:6 }}>Scan to open {co.name} app</div>
+                <div style={{ fontSize:13, fontWeight:700, color:"#2563EB", marginTop:4, letterSpacing:2 }}>{appUrl}</div>
+              </div>
               <div style={{ display:"flex", gap:8 }}>
                 <button style={{ ...S.btnPrim, flex:1, marginTop:0 }} onClick={()=>printQR(co)}>🖨 Print PIN poster</button>
                 <button style={{ ...S.btnSec, flex:1 }} onClick={()=>{ if(confirm("Generate a new PIN? Workers will need the new PIN to log in.")) regeneratePin(co); }}>🔄 New PIN</button>
