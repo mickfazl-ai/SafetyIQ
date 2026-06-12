@@ -5,47 +5,142 @@ const SUPABASE_URL = "https://wwaogpobcnqqxzicjzon.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind3YW9ncG9iY25xcXh6aWNqem9uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwNTQ5ODQsImV4cCI6MjA5NjYzMDk4NH0.eF57eCwnaHUvvAgI9yfO9auAyKTC-C17qZeh_t7GPaQ";
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// ── Data ─────────────────────────────────────────────────────────────────────
+// ── Step 1: Pre-task checklist ────────────────────────────────────────────────
 const STEP1_CHECKS = [
-  { id:"s1_1", text:"Do I understand what I need to do?", swmsTrigger:false },
-  { id:"s1_2", text:"Do I need a SWMS for any High Risk Construction Work?", swmsTrigger:true },
-  { id:"s1_3", text:"Do I need any permits? (e.g. hot work / confined space / dig)", swmsTrigger:true },
-  { id:"s1_4", text:"Do I have the correct PPE in good condition for the task?", swmsTrigger:false },
-  { id:"s1_5", text:"Do I have the suitable tools and equipment for the task?", swmsTrigger:false },
-  { id:"s1_6", text:"Do I have my vehicle parked appropriately?", swmsTrigger:false },
-  { id:"s1_7", text:"Am I trained, competent, licensed and fit to perform this task?", swmsTrigger:true },
+  { id:"s1_1", text:"Do I fully understand the task, the scope of work and the safe work procedure?", swmsTrigger:false },
+  { id:"s1_2", text:"Have I reviewed the relevant risk assessment, SWMS or work instructions for this task?", swmsTrigger:true },
+  { id:"s1_3", text:"Is the work area clear of unauthorised personnel and bystanders?", swmsTrigger:false },
+  { id:"s1_4", text:"Have I inspected my tools and equipment — are they in good condition and fit for purpose?", swmsTrigger:false },
+  { id:"s1_5", text:"Do I have the correct PPE in good condition for this specific task?", swmsTrigger:false },
+  { id:"s1_6", text:"Am I trained, competent, licensed and physically fit to perform this task today?", swmsTrigger:true },
+  { id:"s1_7", text:"Have conditions changed since the last shift or last time this task was performed?", swmsTrigger:false },
 ];
 
+// ── Step 2: High Risk Construction Work selector ──────────────────────────────
+const HRCW_TASKS = [
+  {
+    id:"hrcw_wah",
+    label:"Working at Heights",
+    sub:"Any work above 2 metres, platforms, ladders, scaffolding, elevated surfaces",
+    icon:"🪜",
+    permits:["Height Safety Plan / EWP pre-start must be completed"],
+    triggerLift:false,
+    triggerConfinedSpace:false,
+  },
+  {
+    id:"hrcw_cs",
+    label:"Confined Space Entry",
+    sub:"Any enclosed or partially enclosed space with restricted egress or atmospheric risk",
+    icon:"🚪",
+    permits:["Confined Space Entry Permit required before entry","Atmospheric testing — O₂, CO, LEL must be conducted and recorded"],
+    triggerLift:false,
+    triggerConfinedSpace:true,
+  },
+  {
+    id:"hrcw_lift",
+    label:"Lifting Operations",
+    sub:"Crane, EWP, forklift, chain block, come-along, rigging, slinging of loads",
+    icon:"🏗",
+    permits:["Lift Plan / Rigging Study required","Dogman/rigger tickets must be current"],
+    triggerLift:true,
+    triggerConfinedSpace:false,
+  },
+  {
+    id:"hrcw_press",
+    label:"Pressurised Systems",
+    sub:"Hydraulic/pneumatic systems, pressure testing, hose replacement under pressure, accumulator work",
+    icon:"⚡",
+    permits:["System must be depressurised and isolated before work","Pressure test cert required if post-repair test conducted"],
+    triggerLift:false,
+    triggerConfinedSpace:false,
+  },
+  {
+    id:"hrcw_mech",
+    label:"Mechanical Isolation / LOTO",
+    sub:"Isolating rotating plant, guarded machinery, TBM drives, conveyors, pumps before maintenance",
+    icon:"🔒",
+    permits:["Isolation permit / LOTO procedure must be completed","Zero energy state verified before commencing work"],
+    triggerLift:false,
+    triggerConfinedSpace:false,
+  },
+  {
+    id:"hrcw_demolition",
+    label:"Structural / Demolition Work",
+    sub:"Removing, modifying or installing structural components, machine frames, bearing housings",
+    icon:"🔧",
+    permits:["Engineering sign-off required for structural modifications"],
+    triggerLift:false,
+    triggerConfinedSpace:false,
+  },
+  {
+    id:"hrcw_chem",
+    label:"Hazardous Substances",
+    sub:"Hydraulic oils, greases, epoxy, solvents, cleaning agents, welding fumes, chemical handling",
+    icon:"🧪",
+    permits:["SDS must be available on site","Adequate ventilation and spill containment required"],
+    triggerLift:false,
+    triggerConfinedSpace:false,
+  },
+  {
+    id:"hrcw_mobileplant",
+    label:"Working Near Mobile Plant",
+    sub:"Cranes, forklifts, excavators, vehicles, loaders operating in or near the work area",
+    icon:"🚛",
+    permits:["Exclusion zones must be established and signed","Spotter/traffic controller required where visibility is limited"],
+    triggerLift:false,
+    triggerConfinedSpace:false,
+  },
+  {
+    id:"hrcw_excavation",
+    label:"Excavation / Ground Disturbance",
+    sub:"Any digging, trenching, soil disturbance or work near existing underground services",
+    icon:"⛏",
+    permits:["Before You Dig (BYDA) check required","Dial Before You Dig — 1100"],
+    triggerLift:false,
+    triggerConfinedSpace:false,
+  },
+  {
+    id:"hrcw_none",
+    label:"No High Risk Tasks",
+    sub:"This task does not involve any of the above high risk construction work categories",
+    icon:"✓",
+    permits:[],
+    triggerLift:false,
+    triggerConfinedSpace:false,
+  },
+];
+
+// ── Step 3: Hazard identification (heavy industrial/mechanical) ───────────────
 const HAZARDS = [
-  { id:"h_mh",   label:"Manual Handling",     sub:"Lifting, awkward positions, over-exertion",          weight:"medium" },
-  { id:"h_gr",   label:"Gravity",              sub:"Falls, slips, trips, falling objects",                weight:"high" },
-  { id:"h_mech", label:"Mechanical",           sub:"Moving parts, struck by plant or flying objects",     weight:"high" },
-  { id:"h_elec", label:"Electrical",           sub:"Electrocution from faulty tools or live power",       weight:"high" },
-  { id:"h_chem", label:"Chemical",             sub:"Inhaling, swallowing or touching acid, solvents",     weight:"high" },
-  { id:"h_pres", label:"Pressure",             sub:"Highly pressurised fluid, gas or air",                weight:"high" },
-  { id:"h_exp",  label:"Exposure",             sub:"Noise, dust, fumes, chemicals, asbestos, weather",    weight:"medium" },
-  { id:"h_bio",  label:"Biological",           sub:"Contracting diseases, Hepatitis, Legionella",         weight:"medium" },
-  { id:"h_rad",  label:"Radiation",            sub:"X-rays, sunlight, ultra-violet",                      weight:"medium" },
-  { id:"h_psych",label:"Psychological",        sub:"Stress, violence, fatigue, depression",               weight:"medium" },
-  { id:"h_conf", label:"Confined Space",       sub:"Restricted area, poor ventilation, toxic atmosphere", weight:"high" },
-  { id:"h_lift", label:"Lifting Operations",   sub:"Crane, forklift, EWP, rigging, slinging",            weight:"high" },
-  { id:"h_other",label:"Other Hazards",        sub:"e.g. Silica, asphyxiation, traffic",                  weight:"medium" },
+  { id:"h_mh",    label:"Manual Handling",         sub:"Heavy lifts, awkward postures, repetitive strain, over-exertion",         weight:"medium" },
+  { id:"h_fall",  label:"Falls / Slips / Trips",   sub:"Wet surfaces, uneven ground, steps, open edges, debris on walkways",       weight:"high" },
+  { id:"h_mech",  label:"Mechanical Hazards",       sub:"Rotating parts, nip points, struck by components, swinging loads",         weight:"high" },
+  { id:"h_press", label:"Pressure / Stored Energy", sub:"Hydraulic/pneumatic energy, springs under load, accumulators",             weight:"high" },
+  { id:"h_chem",  label:"Chemical / Substance",     sub:"Hydraulic oil, grease, solvents, cleaning agents, fumes",                  weight:"medium" },
+  { id:"h_noise", label:"Noise / Vibration",        sub:"Impact tools, grinders, heavy machinery, power tools",                     weight:"medium" },
+  { id:"h_heat",  label:"Heat / Burns",             sub:"Hot surfaces, steam, friction, welding, cutting operations",               weight:"medium" },
+  { id:"h_struct",label:"Structural Instability",   sub:"Unsecured machine frames, components overhead, inadequate support",         weight:"high" },
+  { id:"h_env",   label:"Environment / Weather",    sub:"Rain, wind, heat stress, poor lighting, dust, mud",                        weight:"medium" },
+  { id:"h_traffic",label:"Traffic / Mobile Plant",  sub:"Vehicles, forklifts, cranes operating near work area",                     weight:"high" },
+  { id:"h_ergon", label:"Ergonomic / Fatigue",      sub:"Repetitive work, awkward access, end-of-shift fatigue, night work",        weight:"medium" },
+  { id:"h_other", label:"Other Hazard",             sub:"Any hazard not captured above — describe in SWMS",                         weight:"medium" },
 ];
 
+// ── Risk matrix ───────────────────────────────────────────────────────────────
 const LIKELIHOOD = [
-  { value:0, label:"Rare",           short:"Rare (1)",           desc:"May occur only in exceptional circumstances",  color:"#065F46", bg:"#D1FAE5" },
-  { value:1, label:"Unlikely",       short:"Unlikely (2)",       desc:"Could occur at some time but not expected",    color:"#166534", bg:"#BBF7D0" },
-  { value:2, label:"Possible",       short:"Possible (3)",       desc:"Might occur at some time during the task",     color:"#78350F", bg:"#FEF3C7" },
-  { value:3, label:"Likely",         short:"Likely (4)",         desc:"Will probably occur in most circumstances",    color:"#92400E", bg:"#FDE68A" },
-  { value:4, label:"Almost Certain", short:"Almost Certain (5)", desc:"Is expected to occur during the task",         color:"#B91C1C", bg:"#FEE2E2" },
+  { value:0, label:"Rare",           short:"Rare (1)",           desc:"May occur only in exceptional circumstances",   color:"#065F46", bg:"#D1FAE5" },
+  { value:1, label:"Unlikely",       short:"Unlikely (2)",       desc:"Could occur at some time but not expected",     color:"#166534", bg:"#BBF7D0" },
+  { value:2, label:"Possible",       short:"Possible (3)",       desc:"Might occur at some time during the task",      color:"#78350F", bg:"#FEF3C7" },
+  { value:3, label:"Likely",         short:"Likely (4)",         desc:"Will probably occur in most circumstances",     color:"#92400E", bg:"#FDE68A" },
+  { value:4, label:"Almost Certain", short:"Almost Certain (5)", desc:"Is expected to occur during this task",         color:"#B91C1C", bg:"#FEE2E2" },
 ];
 
 const CONSEQUENCE = [
-  { value:0, label:"Insignificant", short:"Insignificant (1)", desc:"No injury, minor first aid only",                     color:"#065F46", bg:"#D1FAE5" },
-  { value:1, label:"Minor",         short:"Minor (2)",         desc:"Minor injury, limited medical treatment",             color:"#166534", bg:"#BBF7D0" },
-  { value:2, label:"Moderate",      short:"Moderate (3)",      desc:"Medical treatment required, restricted duties",       color:"#78350F", bg:"#FEF3C7" },
-  { value:3, label:"Major",         short:"Major (4)",         desc:"Significant injury, long term illness or disability", color:"#92400E", bg:"#FDE68A" },
-  { value:4, label:"Catastrophic",  short:"Catastrophic (5)",  desc:"Death or permanent total disability",                 color:"#7F1D1D", bg:"#fecaca" },
+  { value:0, label:"Insignificant", short:"Insignificant (1)", desc:"No injury, minor first aid only",                      color:"#065F46", bg:"#D1FAE5" },
+  { value:1, label:"Minor",         short:"Minor (2)",         desc:"Minor injury, limited medical treatment",              color:"#166534", bg:"#BBF7D0" },
+  { value:2, label:"Moderate",      short:"Moderate (3)",      desc:"Medical treatment required, restricted duties",        color:"#78350F", bg:"#FEF3C7" },
+  { value:3, label:"Major",         short:"Major (4)",         desc:"Significant injury, long term illness or disability",  color:"#92400E", bg:"#FDE68A" },
+  { value:4, label:"Catastrophic",  short:"Catastrophic (5)",  desc:"Death or permanent total disability",                  color:"#7F1D1D", bg:"#fecaca" },
 ];
 
 const RISK_LEVEL = [
@@ -57,23 +152,36 @@ const RISK_LEVEL = [
 
 function matrixRating(l, c) {
   const s = (l+1)*(c+1);
-  if (s<=4)  return RISK_LEVEL[0];
-  if (s<=9)  return RISK_LEVEL[1];
+  if (s<=4) return RISK_LEVEL[0];
+  if (s<=9) return RISK_LEVEL[1];
   if (s<=16) return RISK_LEVEL[2];
   return RISK_LEVEL[3];
 }
 
 const LIFT_CHECKS = [
-  "Has a Lift Plan / Engineering Lift Study been completed?",
+  "Has a Lift Plan / Rigging Study been completed and approved?",
   "Is the crane / EWP / forklift pre-start inspection current?",
   "Is the operator licensed and competent for this equipment?",
-  "Has the load weight been confirmed and within SWL?",
-  "Are rigger/dogman tickets current and relevant?",
-  "Has the exclusion zone been established and signed?",
-  "Are underground services and overhead obstructions checked?",
-  "Are environmental conditions (wind, visibility) acceptable?",
+  "Has the load weight been confirmed and is it within the SWL?",
+  "Are rigger/dogman tickets current and relevant to this lift?",
+  "Has the exclusion zone been established, signed and communicated?",
+  "Are overhead obstructions and underground services checked?",
+  "Are environmental conditions (wind speed, visibility) acceptable?",
   "Is tag line control in place for load management?",
-  "Has the lift been communicated via TBT/toolbox talk?",
+  "Has the lift been communicated via toolbox talk or pre-start?",
+  "Is the rigging equipment (slings, shackles, hooks) inspected and tagged?",
+  "Is the landing zone clear and prepared to receive the load?",
+];
+
+const CONFINED_SPACE_CHECKS = [
+  "Has an atmospheric test been completed? (O₂ 19.5–23.5%, LEL <10%, CO <25ppm)",
+  "Is a Confined Space Entry Permit in place and signed off?",
+  "Is a standby person assigned and stationed at the entry point?",
+  "Is rescue equipment available and workers trained in its use?",
+  "Is ventilation adequate — forced air ventilation in place if required?",
+  "Has the space been isolated from all energy sources and services?",
+  "Do all entrants understand the emergency evacuation procedure?",
+  "Is continuous atmospheric monitoring in place during the task?",
 ];
 
 // ── Styles ────────────────────────────────────────────────────────────────────
@@ -107,8 +215,7 @@ function Logo({ size=44 }) {
   );
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-function Pips({ active, total=5 }) {
+function Pips({ active, total=6 }) {
   return (
     <div style={{ display:"flex", gap:4, marginBottom:14 }}>
       {Array.from({length:total}).map((_,i) => (
@@ -154,7 +261,7 @@ function LiveRisk({ l, c }) {
   );
 }
 
-// ── PIN LOGIN SCREEN ──────────────────────────────────────────────────────────
+// ── PIN LOGIN ─────────────────────────────────────────────────────────────────
 function PinLogin({ onSuccess, onAdminClick }) {
   const [pin, setPin] = useState("");
   const [error, setError] = useState("");
@@ -166,70 +273,42 @@ function PinLogin({ onSuccess, onAdminClick }) {
     setError("");
     if (next.length === 6) {
       setLoading(true);
-      const { data, error } = await supabase
-        .from("companies")
-        .select("id,name")
-        .eq("pin", next)
-        .eq("is_active", true)
-        .single();
-      if (error || !data) {
-        setError("Invalid PIN — check with your supervisor");
-        setPin("");
-      } else {
-        onSuccess({ company_id: data.id, company_name: data.name });
-      }
+      const { data, error } = await supabase.from("companies").select("id,name").eq("pin", next).eq("is_active", true).single();
+      if (error || !data) { setError("Invalid PIN — check with your supervisor"); setPin(""); }
+      else onSuccess({ company_id:data.id, company_name:data.name });
       setLoading(false);
     }
   }
-
-  function handleDelete() { setPin(p => p.slice(0,-1)); setError(""); }
 
   const digits = ["1","2","3","4","5","6","7","8","9","","0","⌫"];
 
   return (
     <div style={{ minHeight:"100vh", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", background:"#F9FAFB", padding:16 }}>
-      {/* Admin button top right */}
-      <button onClick={onAdminClick}
-        style={{ position:"fixed", top:16, right:16, background:"#fff", border:"1px solid #E5E7EB", borderRadius:8, padding:"7px 14px", fontSize:13, fontWeight:600, color:"#6B7280", cursor:"pointer", boxShadow:"0 1px 3px rgba(0,0,0,.08)" }}>
+      <button onClick={onAdminClick} style={{ position:"fixed", top:16, right:16, background:"#fff", border:"1px solid #E5E7EB", borderRadius:8, padding:"7px 14px", fontSize:13, fontWeight:600, color:"#6B7280", cursor:"pointer", boxShadow:"0 1px 3px rgba(0,0,0,.08)" }}>
         Admin login
       </button>
-
-      {/* Logo */}
       <div style={{ textAlign:"center", marginBottom:32 }}>
-        <div style={{ display:"flex", justifyContent:"center", marginBottom:12 }}>
-          <Logo size={72} />
-        </div>
-        <div style={{ fontSize:28, fontWeight:800, color:"#1F2937" }}>Safety<span style={{ color:"#2563EB" }}>IQ</span></div>
+        <div style={{ display:"flex", justifyContent:"center", marginBottom:12 }}><Logo size={72} /></div>
+        <div style={{ fontSize:28, fontWeight:800, color:"#1F2937" }}>Safety<span style={{color:"#2563EB"}}>IQ</span></div>
         <div style={{ fontSize:14, color:"#9CA3AF", marginTop:4 }}>Enter your site PIN to begin</div>
       </div>
-
-      {/* PIN dots */}
       <div style={{ display:"flex", gap:12, marginBottom:24 }}>
         {Array.from({length:6}).map((_,i) => (
-          <div key={i} style={{ width:18, height:18, borderRadius:"50%", background: i<pin.length?"#2563EB":"#E5E7EB", transition:"background .15s" }} />
+          <div key={i} style={{ width:18, height:18, borderRadius:"50%", background:i<pin.length?"#2563EB":"#E5E7EB", transition:"background .15s" }} />
         ))}
       </div>
-
-      {error && (
-        <div style={{ marginBottom:16, padding:"10px 16px", borderRadius:10, background:"#FEE2E2", color:"#B91C1C", fontSize:14, fontWeight:500, textAlign:"center", maxWidth:280 }}>
-          {error}
-        </div>
-      )}
-
-      {/* Keypad */}
+      {error && <div style={{ marginBottom:16, padding:"10px 16px", borderRadius:10, background:"#FEE2E2", color:"#B91C1C", fontSize:14, fontWeight:500, textAlign:"center", maxWidth:280 }}>{error}</div>}
       <div style={{ display:"grid", gridTemplateColumns:"repeat(3, 80px)", gap:12, maxWidth:280 }}>
         {digits.map((d,i) => (
-          <button key={i} onClick={() => d==="⌫" ? handleDelete() : d!==""&&!loading ? handlePin(d) : null}
-            disabled={loading || (d==="")}
-            style={{ height:80, borderRadius:16, border:"1px solid #E5E7EB", fontSize: d==="⌫"?22:28, fontWeight:700,
-              background: d===""?"transparent":"#fff", color: d==="⌫"?"#9CA3AF":"#1F2937",
-              cursor: d===""?"default":"pointer", boxShadow: d!=""?"0 1px 3px rgba(0,0,0,.08)":"none",
-              opacity: loading?.5:1, transition:"background .1s" }}>
+          <button key={i} onClick={()=> d==="⌫" ? setPin(p=>p.slice(0,-1)) : d!==""&&!loading ? handlePin(d) : null}
+            disabled={loading||(d==="")}
+            style={{ height:80, borderRadius:16, border:"1px solid #E5E7EB", fontSize:d==="⌫"?22:28, fontWeight:700,
+              background:d===""?"transparent":"#fff", color:d==="⌫"?"#9CA3AF":"#1F2937",
+              cursor:d===""?"default":"pointer", boxShadow:d!=""?"0 1px 3px rgba(0,0,0,.08)":"none", opacity:loading?.5:1 }}>
             {d}
           </button>
         ))}
       </div>
-
       {loading && <div style={{ marginTop:20, color:"#6B7280", fontSize:14 }}>Checking PIN...</div>}
     </div>
   );
@@ -251,9 +330,7 @@ function AdminLogin({ onSuccess, onBack }) {
 
   return (
     <div style={{ minHeight:"100vh", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", background:"#F9FAFB", padding:16 }}>
-      <button onClick={onBack} style={{ position:"fixed", top:16, left:16, background:"#fff", border:"1px solid #E5E7EB", borderRadius:8, padding:"7px 14px", fontSize:13, fontWeight:600, color:"#6B7280", cursor:"pointer" }}>
-        ← Back
-      </button>
+      <button onClick={onBack} style={{ position:"fixed", top:16, left:16, background:"#fff", border:"1px solid #E5E7EB", borderRadius:8, padding:"7px 14px", fontSize:13, fontWeight:600, color:"#6B7280", cursor:"pointer" }}>← Back</button>
       <div style={{ textAlign:"center", marginBottom:28 }}>
         <div style={{ display:"flex", justifyContent:"center", marginBottom:10 }}><Logo size={56} /></div>
         <div style={{ fontSize:22, fontWeight:800, color:"#1F2937" }}>Admin login</div>
@@ -265,15 +342,13 @@ function AdminLogin({ onSuccess, onBack }) {
           <div><label style={S.label}>Password</label><input style={S.input} type="password" value={form.password} onChange={set("password")} placeholder="Password" /></div>
         </div>
         {error && <div style={{ marginTop:10, padding:"10px 12px", borderRadius:8, background:"#FEE2E2", color:"#B91C1C", fontSize:13 }}>{error}</div>}
-        <button style={{ ...S.btnPrim, opacity:loading?.5:1 }} onClick={handleLogin} disabled={loading}>
-          {loading?"Logging in...":"Log in as admin"}
-        </button>
+        <button style={{ ...S.btnPrim, opacity:loading?.5:1 }} onClick={handleLogin} disabled={loading}>{loading?"Logging in...":"Log in as admin"}</button>
       </div>
     </div>
   );
 }
 
-// ── ADMIN SETTINGS ────────────────────────────────────────────────────────────
+// ── SETTINGS PAGE ─────────────────────────────────────────────────────────────
 function SettingsPage({ onBack }) {
   const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -292,9 +367,7 @@ function SettingsPage({ onBack }) {
     setLoading(false);
   }
 
-  function generatePin() {
-    return String(Math.floor(100000 + Math.random()*900000));
-  }
+  function generatePin() { return String(Math.floor(100000 + Math.random()*900000)); }
 
   async function addCompany() {
     if (!newCo.name) return;
@@ -309,104 +382,52 @@ function SettingsPage({ onBack }) {
 
   async function regeneratePin(co) {
     const newPin = generatePin();
-    const { error } = await supabase.from("companies").update({ pin:newPin }).eq("id", co.id);
-    if (!error) loadCompanies();
+    await supabase.from("companies").update({ pin:newPin }).eq("id", co.id);
+    loadCompanies();
   }
 
   function printQR(co) {
     const url = appUrl;
     const w = window.open("","_blank","width=850,height=900");
-    const qrScript = `<script>var QRCode=function(){function a(a){this.mode=4;this.data=a;this.parsedData=[];for(var b=[],d=0,e=a.length;d<e;d++){var f=a.charCodeAt(d);if(f>65536){b[0]=240|(f>>>18);b[1]=128|(f>>>12&63);b[2]=128|(f>>>6&63);b[3]=128|(63&f)}else if(f>2048){b[0]=224|(f>>>12);b[1]=128|(f>>>6&63);b[2]=128|(63&f)}else if(f>128){b[0]=192|(f>>>6);b[1]=128|(63&f)}else{b[0]=f}this.parsedData=this.parsedData.concat(b)}if(this.parsedData.length!=a.length){this.parsedData.unshift(191);this.parsedData.unshift(187);this.parsedData.unshift(239)}}a.prototype={getLength:function(){return this.parsedData.length},write:function(a){for(var b=0;b<this.parsedData.length;b++)a.put(this.parsedData[b],8)}};function b(a,b){this.typeNumber=a;this.errorCorrectLevel=b;this.modules=null;this.moduleCount=0;this.dataCache=null;this.dataList=[]}b.prototype={addData:function(b){this.dataList.push(new a(b));this.dataCache=null},isDark:function(a,b){return this.modules[a][b]},getModuleCount:function(){return this.moduleCount},make:function(){var a=0;for(var c=0;c<8;c++){this.makeImpl(true,c);var d=getLostPoint(this);if(c==0||a>d){a=d;var e=c}}this.makeImpl(false,e)},makeImpl:function(a,c){this.moduleCount=4*this.typeNumber+17;this.modules=[];for(var d=0;d<this.moduleCount;d++){this.modules[d]=[];for(var e=0;e<this.moduleCount;e++)this.modules[d][e]=null}this.setupPositionProbePattern(0,0);this.setupPositionProbePattern(this.moduleCount-7,0);this.setupPositionProbePattern(0,this.moduleCount-7);this.setupTimingPattern();this.setupTypeInfo(a,c);if(null==this.dataCache)this.dataCache=createData(this.typeNumber,this.errorCorrectLevel,this.dataList);this.mapData(this.dataCache,c)},setupPositionProbePattern:function(a,b){for(var c=-1;c<=7;c++){if(a+c<0||this.moduleCount<=a+c)continue;for(var d=-1;d<=7;d++){if(b+d<0||this.moduleCount<=b+d)continue;this.modules[a+c][b+d]=(c>=0&&c<=6&&(d==0||d==6))||(d>=0&&d<=6&&(c==0||c==6))||(c>=2&&c<=4&&d>=2&&d<=4)}}},setupTimingPattern:function(){for(var a=8;a<this.moduleCount-8;a++)if(null==this.modules[a][6])this.modules[a][6]=(a%2==0);for(var b=8;b<this.moduleCount-8;b++)if(null==this.modules[6][b])this.modules[6][b]=(b%2==0)},setupTypeInfo:function(a,b){var c=(1<<3)|b;var d=getBCHTypeInfo(c);for(var e=0;e<15;e++){var f=!a&&((d>>e)&1)==1;if(e<6)this.modules[e][8]=f;else if(e<7)this.modules[e+1][8]=f;else this.modules[this.moduleCount-15+e][8]=f}for(var g=0;g<15;g++){var h=!a&&((d>>g)&1)==1;if(g<8)this.modules[8][this.moduleCount-g-1]=h;else if(g<9)this.modules[8][15-g-1+1]=h;else this.modules[8][15-g-1]=h}this.modules[this.moduleCount-8][8]=!a},mapData:function(a,b){var c=-1;var d=this.moduleCount-1;var e=7;var f=0;for(var g=this.moduleCount-1;g>0;g-=2){if(g==6)g--;for(;;){for(var h=0;h<2;h++){if(null==this.modules[d][g-h]){var i=false;if(f<a.length)i=((a[f]>>e)&1)==1;if(getMask(b,d,g-h))i=!i;this.modules[d][g-h]=i;e--;if(e==-1){f++;e=7}}}d+=c;if(d<0||this.moduleCount<=d){d-=c;c=-c;break}}}}};function getLostPoint(a){var b=a.getModuleCount();var c=0;for(var d=0;d<b;d++){for(var e=0;e<b;e++){var f=0;var g=a.isDark(d,e);for(var h=-1;h<=1;h++){if(d+h<0||b<=d+h)continue;for(var i=-1;i<=1;i++){if(e+i<0||b<=e+i)continue;if(h==0&&i==0)continue;if(g==a.isDark(d+h,e+i))f++}}if(f>5)c+=3+f-5}}return c}function getMask(a,b,c){switch(a){case 0:return(b+c)%2==0;case 1:return b%2==0;case 2:return c%3==0;case 3:return(b+c)%3==0;case 4:return(Math.floor(b/2)+Math.floor(c/3))%2==0;case 5:return b*c%2+b*c%3==0;case 6:return(b*c%2+b*c%3)%2==0;case 7:return(b*c%3+(b+c)%2)%2==0}}function getBCHTypeInfo(a){var b=a<<10;while(getBCHDigit(b)-getBCHDigit(1335)>=0)b^=1335<<getBCHDigit(b)-getBCHDigit(1335);return(a<<10|b)^21522}function getBCHDigit(a){var b=0;while(a!=0){b++;a>>>=1}return b}function createData(a,b,c){var d=getRSBlocks(a,b);var e=new BitBuffer();for(var f=0;f<c.length;f++){var g=c[f];e.put(g.mode,4);e.put(g.getLength(),getLengthInBits(g.mode,a));g.write(e)}var h=0;for(var i=0;i<d.length;i++)h+=d[i].dataCount;if(e.getLengthInBits()>8*h)throw new Error("overflow");if(e.getLengthInBits()+4<=8*h)e.put(0,4);while(e.getLengthInBits()%8!=0)e.putBit(false);while(true){if(e.getLengthInBits()>=8*h)break;e.put(236,8);if(e.getLengthInBits()>=8*h)break;e.put(17,8)}return createBytes(e,d)}function createBytes(a,b){var c=0;var d=0;var e=0;var f=new Array(b.length);var g=new Array(b.length);for(var h=0;h<b.length;h++){var i=b[h].dataCount;var j=b[h].totalCount-i;d=Math.max(d,i);e=Math.max(e,j);f[h]=new Array(i);for(var k=0;k<f[h].length;k++)f[h][k]=255&a.buffer[c++];g[h]=new Array(j);for(var l=0;l<g[h].length;l++)g[h][l]=0}var m=[];for(var n=0;n<b.length;n++)m.push(new Array(b[n].totalCount-b[n].dataCount));var o=[];for(var p=0;p<b.length;p++){var q=getErrorCorrectPolynomial(b[p].totalCount-b[p].dataCount);var r=new Polynomial(f[p],q.getLength()-1);var s=r.mod(q);for(var t=0;t<m[p].length;t++){var u=t+s.getLength()-m[p].length;m[p][t]=u>=0?s.get(u):0}}var v=new Array(b.reduce(function(a,b){return a+b.totalCount},0));var w=0;for(var x=0;x<d;x++)for(var y=0;y<b.length;y++)if(x<f[y].length)v[w++]=f[y][x];for(var z=0;z<e;z++)for(var A=0;A<b.length;A++)if(z<g[A].length)v[w++]=g[A][z];for(var B=0;B<m[0].length;B++)for(var C=0;C<b.length;C++)v[w++]=m[C][B];return v}function getLengthInBits(a,b){if(b>=1&&b<10){if(a==4)return 8}else if(b<27){if(a==4)return 16}else{if(a==4)return 16}return 8}function getErrorCorrectPolynomial(a){var b=new Polynomial([1],0);for(var c=0;c<a;c++)b=b.multiply(new Polynomial([1,gexp(c)],0));return b}var EXP_TABLE=new Array(256);var LOG_TABLE=new Array(256);for(var i=0;i<8;i++)EXP_TABLE[i]=1<<i;for(var i=8;i<256;i++)EXP_TABLE[i]=EXP_TABLE[i-4]^EXP_TABLE[i-5]^EXP_TABLE[i-6]^EXP_TABLE[i-8];for(var i=0;i<255;i++)LOG_TABLE[EXP_TABLE[i]]=i;function gexp(a){while(a<0)a+=255;while(a>=256)a-=255;return EXP_TABLE[a]}function glog(a){if(a<1)throw new Error("glog("+a+")");return LOG_TABLE[a]}function Polynomial(a,b){var c=0;while(c<a.length&&a[c]==0)c++;this.num=new Array(a.length-c+b);for(var d=0;d<a.length-c;d++)this.num[d]=a[d+c]}Polynomial.prototype={get:function(a){return this.num[a]},getLength:function(){return this.num.length},multiply:function(a){var b=new Array(this.getLength()+a.getLength()-1);for(var c=0;c<this.getLength();c++)for(var d=0;d<a.getLength();d++)b[c+d]^=gexp(glog(this.get(c))+glog(a.get(d)));return new Polynomial(b,0)},mod:function(a){if(this.getLength()-a.getLength()<0)return this;var b=glog(this.get(0))-glog(a.get(0));var c=new Array(this.getLength());for(var d=0;d<this.getLength();d++)c[d]=this.get(d);for(var e=0;e<a.getLength();e++)c[e]^=gexp(glog(a.get(e))+b);return new Polynomial(c,0).mod(a)}};function BitBuffer(){this.buffer=[];this.length=0}BitBuffer.prototype={get:function(a){return((this.buffer[Math.floor(a/8)]>>>(7-a%8))&1)==1},put:function(a,b){for(var c=0;c<b;c++)this.putBit(((a>>>(b-c-1))&1)==1)},getLengthInBits:function(){return this.length},putBit:function(a){var b=Math.floor(this.length/8);if(this.buffer.length<=b)this.buffer.push(0);if(a)this.buffer[b]|=128>>>(this.length%8);this.length++}};function RSBlock(a,b){this.totalCount=a;this.dataCount=b}var RS_BLOCK_TABLE=[[1,26,19],[1,26,16],[1,26,13],[1,26,9],[1,44,34],[1,44,28],[1,44,22],[1,44,16],[1,70,55],[1,70,44],[2,35,17],[2,35,13],[1,100,80],[2,50,32],[2,50,24],[4,25,9],[1,134,108],[2,67,43],[2,33,15,2,34,16],[2,33,11,2,34,12],[2,86,68],[4,43,27],[4,43,19],[4,43,15],[2,98,78],[4,49,31],[2,32,14,4,33,15],[4,39,13,1,40,14],[2,121,97],[2,60,38,2,61,39],[4,40,18,2,41,19],[4,40,14,2,41,15],[2,146,116],[3,58,36,2,59,37],[4,36,16,4,37,17],[4,36,12,4,37,13]];function getRSBlocks(a,b){var c=RS_BLOCK_TABLE[(a-1)*4+(b==1?0:b==0?1:b==3?2:3)];if(!c)throw new Error("bad rs block");var d=c.length/3;var e=[];for(var f=0;f<d;f++)for(var g=c[3*f+0],h=c[3*f+1],i=c[3*f+2],j=0;j<g;j++)e.push(new RSBlock(h,i));return e}window.makeQR=function(text,size){try{var qr=new b(5,0);qr.addData(text);qr.make();var n=qr.getModuleCount();var canvas=document.createElement("canvas");canvas.width=canvas.height=size;var ctx=canvas.getContext("2d");ctx.fillStyle="#FFFFFF";ctx.fillRect(0,0,size,size);ctx.fillStyle="#000000";var s=size/n;for(var r=0;r<n;r++)for(var c2=0;c2<n;c2++)if(qr.isDark(r,c2))ctx.fillRect(Math.round(c2*s),Math.round(r*s),Math.ceil(s),Math.ceil(s));return canvas.toDataURL("image/png")}catch(e){return null}};
-    <\/script>`;
-    w.document.write(`<html><head><style>
-      *{box-sizing:border-box;margin:0;padding:0}
-      body{font-family:Arial,sans-serif;background:#fff;color:#1F2937}
-      .page{max-width:680px;margin:0 auto;padding:40px 32px}
-      .top{display:flex;align-items:center;justify-content:space-between;padding-bottom:20px;border-bottom:3px solid #2563EB;margin-bottom:28px}
-      .brand{display:flex;align-items:center;gap:14px}
-      .brand-name{font-size:32px;font-weight:900;line-height:1}
-      .brand-tag{font-size:13px;color:#6B7280;margin-top:4px;letter-spacing:1px}
-      .company{font-size:22px;font-weight:700;color:#2563EB;text-align:right}
-      .company-sub{font-size:13px;color:#9CA3AF;text-align:right;margin-top:2px}
-      .main{display:flex;gap:32px;align-items:flex-start;margin-bottom:28px}
-      .qr-box{flex-shrink:0;text-align:center}
-      .qr-box img{border:3px solid #E5E7EB;border-radius:12px;display:block}
-      .qr-label{font-size:12px;color:#9CA3AF;margin-top:6px}
-      .right{flex:1}
-      .instruction{font-size:15px;color:#374151;margin-bottom:16px;line-height:1.5}
-      .pin-box{background:#EFF6FF;border:2px solid #BFDBFE;border-radius:16px;padding:20px 24px;text-align:center;margin-bottom:20px}
-      .pin-label{font-size:13px;color:#6B7280;font-weight:600;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
-      .pin{font-size:52px;font-weight:900;color:#2563EB;letter-spacing:14px;line-height:1}
-      .steps{background:#F9FAFB;border-radius:12px;padding:18px 20px}
-      .steps-title{font-size:14px;font-weight:700;margin-bottom:10px;color:#374151}
-      .steps ol{padding-left:20px}
-      .steps li{font-size:14px;line-height:1.6;color:#374151;margin-bottom:4px}
-      .steps li strong{color:#2563EB}
-      .footer{border-top:1px solid #E5E7EB;padding-top:16px;display:flex;justify-content:space-between;align-items:center}
-      .footer-url{font-size:14px;font-weight:700;color:#2563EB}
-      .footer-note{font-size:12px;color:#9CA3AF}
-      .noprint{margin-top:24px;text-align:center}
-      @media print{.noprint{display:none}body{padding:0}.page{padding:24px 20px}}
-    </style></head><body>
+    const qrScript = `<script>var QRCode=function(){function a(a){this.mode=4;this.data=a;this.parsedData=[];for(var b=[],d=0,e=a.length;d<e;d++){var f=a.charCodeAt(d);if(f>65536){b[0]=240|(f>>>18);b[1]=128|(f>>>12&63);b[2]=128|(f>>>6&63);b[3]=128|(63&f)}else if(f>2048){b[0]=224|(f>>>12);b[1]=128|(f>>>6&63);b[2]=128|(63&f)}else if(f>128){b[0]=192|(f>>>6);b[1]=128|(63&f)}else{b[0]=f}this.parsedData=this.parsedData.concat(b)}if(this.parsedData.length!=a.length){this.parsedData.unshift(191);this.parsedData.unshift(187);this.parsedData.unshift(239)}}a.prototype={getLength:function(){return this.parsedData.length},write:function(a){for(var b=0;b<this.parsedData.length;b++)a.put(this.parsedData[b],8)}};function b(a,b){this.typeNumber=a;this.errorCorrectLevel=b;this.modules=null;this.moduleCount=0;this.dataCache=null;this.dataList=[]}b.prototype={addData:function(b){this.dataList.push(new a(b));this.dataCache=null},isDark:function(a,b){return this.modules[a][b]},getModuleCount:function(){return this.moduleCount},make:function(){var a=0;for(var c=0;c<8;c++){this.makeImpl(true,c);var d=getLostPoint(this);if(c==0||a>d){a=d;var e=c}}this.makeImpl(false,e)},makeImpl:function(a,c){this.moduleCount=4*this.typeNumber+17;this.modules=[];for(var d=0;d<this.moduleCount;d++){this.modules[d]=[];for(var e=0;e<this.moduleCount;e++)this.modules[d][e]=null}this.setupPositionProbePattern(0,0);this.setupPositionProbePattern(this.moduleCount-7,0);this.setupPositionProbePattern(0,this.moduleCount-7);this.setupTimingPattern();this.setupTypeInfo(a,c);if(null==this.dataCache)this.dataCache=createData(this.typeNumber,this.errorCorrectLevel,this.dataList);this.mapData(this.dataCache,c)},setupPositionProbePattern:function(a,b){for(var c=-1;c<=7;c++){if(a+c<0||this.moduleCount<=a+c)continue;for(var d=-1;d<=7;d++){if(b+d<0||this.moduleCount<=b+d)continue;this.modules[a+c][b+d]=(c>=0&&c<=6&&(d==0||d==6))||(d>=0&&d<=6&&(c==0||c==6))||(c>=2&&c<=4&&d>=2&&d<=4)}}},setupTimingPattern:function(){for(var a=8;a<this.moduleCount-8;a++)if(null==this.modules[a][6])this.modules[a][6]=(a%2==0);for(var b=8;b<this.moduleCount-8;b++)if(null==this.modules[6][b])this.modules[6][b]=(b%2==0)},setupTypeInfo:function(a,b){var c=(1<<3)|b;var d=getBCHTypeInfo(c);for(var e=0;e<15;e++){var f=!a&&((d>>e)&1)==1;if(e<6)this.modules[e][8]=f;else if(e<7)this.modules[e+1][8]=f;else this.modules[this.moduleCount-15+e][8]=f}for(var g=0;g<15;g++){var h=!a&&((d>>g)&1)==1;if(g<8)this.modules[8][this.moduleCount-g-1]=h;else if(g<9)this.modules[8][15-g-1+1]=h;else this.modules[8][15-g-1]=h}this.modules[this.moduleCount-8][8]=!a},mapData:function(a,b){var c=-1;var d=this.moduleCount-1;var e=7;var f=0;for(var g=this.moduleCount-1;g>0;g-=2){if(g==6)g--;for(;;){for(var h=0;h<2;h++){if(null==this.modules[d][g-h]){var i=false;if(f<a.length)i=((a[f]>>e)&1)==1;if(getMask(b,d,g-h))i=!i;this.modules[d][g-h]=i;e--;if(e==-1){f++;e=7}}}d+=c;if(d<0||this.moduleCount<=d){d-=c;c=-c;break}}}}};function getLostPoint(a){var b=a.getModuleCount();var c=0;for(var d=0;d<b;d++){for(var e=0;e<b;e++){var f=0;var g=a.isDark(d,e);for(var h=-1;h<=1;h++){if(d+h<0||b<=d+h)continue;for(var i=-1;i<=1;i++){if(e+i<0||b<=e+i)continue;if(h==0&&i==0)continue;if(g==a.isDark(d+h,e+i))f++}}if(f>5)c+=3+f-5}}return c}function getMask(a,b,c){switch(a){case 0:return(b+c)%2==0;case 1:return b%2==0;case 2:return c%3==0;case 3:return(b+c)%3==0;case 4:return(Math.floor(b/2)+Math.floor(c/3))%2==0;case 5:return b*c%2+b*c%3==0;case 6:return(b*c%2+b*c%3)%2==0;case 7:return(b*c%3+(b+c)%2)%2==0}}function getBCHTypeInfo(a){var b=a<<10;while(getBCHDigit(b)-getBCHDigit(1335)>=0)b^=1335<<getBCHDigit(b)-getBCHDigit(1335);return(a<<10|b)^21522}function getBCHDigit(a){var b=0;while(a!=0){b++;a>>>=1}return b}function createData(a,b,c){var d=getRSBlocks(a,b);var e=new BitBuffer();for(var f=0;f<c.length;f++){var g=c[f];e.put(g.mode,4);e.put(g.getLength(),8);g.write(e)}var h=0;for(var i=0;i<d.length;i++)h+=d[i].dataCount;if(e.getLengthInBits()>8*h)throw new Error("overflow");if(e.getLengthInBits()+4<=8*h)e.put(0,4);while(e.getLengthInBits()%8!=0)e.putBit(false);while(true){if(e.getLengthInBits()>=8*h)break;e.put(236,8);if(e.getLengthInBits()>=8*h)break;e.put(17,8)}return createBytes(e,d)}function createBytes(a,b){var c=0,d=0,e=0;var f=[];var g=[];for(var h=0;h<b.length;h++){var i=b[h].dataCount;var j=b[h].totalCount-i;d=Math.max(d,i);e=Math.max(e,j);f[h]=new Array(i);for(var k=0;k<f[h].length;k++)f[h][k]=255&a.buffer[c++];g[h]=new Array(j);for(var l=0;l<g[h].length;l++)g[h][l]=0}var m=[];for(var n=0;n<b.length;n++){var o=getECP(b[n].totalCount-b[n].dataCount);var p=new Poly(f[n],o.getLength()-1);var q=p.mod(o);m[n]=new Array(b[n].totalCount-b[n].dataCount);for(var r=0;r<m[n].length;r++){var s=r+q.getLength()-m[n].length;m[n][r]=s>=0?q.get(s):0}}var t=new Array(b.reduce(function(a,b){return a+b.totalCount},0));var u=0;for(var v=0;v<d;v++)for(var w=0;w<b.length;w++)if(v<f[w].length)t[u++]=f[w][v];for(var x=0;x<e;x++)for(var y=0;y<b.length;y++)if(x<g[y].length)t[u++]=g[y][x];for(var z=0;z<m[0].length;z++)for(var A=0;A<b.length;A++)t[u++]=m[A][z];return t}var EXP=[],LOG=[];for(var i=0;i<8;i++)EXP[i]=1<<i;for(var i=8;i<256;i++)EXP[i]=EXP[i-4]^EXP[i-5]^EXP[i-6]^EXP[i-8];for(var i=0;i<255;i++)LOG[EXP[i]]=i;function gexp(a){while(a<0)a+=255;while(a>=256)a-=255;return EXP[a]}function glog(a){return LOG[a]}function getECP(a){var b=new Poly([1],0);for(var c=0;c<a;c++)b=b.multiply(new Poly([1,gexp(c)],0));return b}function Poly(a,b){var c=0;while(c<a.length&&a[c]==0)c++;this.num=new Array(a.length-c+b);for(var d=0;d<a.length-c;d++)this.num[d]=a[d+c]}Poly.prototype={get:function(a){return this.num[a]},getLength:function(){return this.num.length},multiply:function(a){var b=new Array(this.getLength()+a.getLength()-1);for(var c=0;c<this.getLength();c++)for(var d=0;d<a.getLength();d++)b[c+d]^=gexp(glog(this.get(c))+glog(a.get(d)));return new Poly(b,0)},mod:function(a){if(this.getLength()-a.getLength()<0)return this;var b=glog(this.get(0))-glog(a.get(0));var c=this.num.slice();for(var d=0;d<a.getLength();d++)c[d]^=gexp(glog(a.get(d))+b);return new Poly(c,0).mod(a)}};function BitBuffer(){this.buffer=[];this.length=0}BitBuffer.prototype={put:function(a,b){for(var c=0;c<b;c++)this.putBit(((a>>>(b-c-1))&1)==1)},getLengthInBits:function(){return this.length},putBit:function(a){var b=Math.floor(this.length/8);if(this.buffer.length<=b)this.buffer.push(0);if(a)this.buffer[b]|=128>>>(this.length%8);this.length++}};function RSBlock(a,b){this.totalCount=a;this.dataCount=b}var RST=[[1,26,19],[1,26,16],[1,26,13],[1,26,9],[1,44,34],[1,44,28],[1,44,22],[1,44,16],[1,70,55],[1,70,44],[2,35,17],[2,35,13],[1,100,80],[2,50,32],[2,50,24],[4,25,9],[1,134,108],[2,67,43],[2,33,15,2,34,16],[2,33,11,2,34,12]];function getRSBlocks(a,b){var c=RST[(a-1)*4+(b==1?0:1)];if(!c)throw new Error("bad rs");var d=c.length/3;var e=[];for(var f=0;f<d;f++)for(var g=c[3*f],h=c[3*f+1],i=c[3*f+2],j=0;j<g;j++)e.push(new RSBlock(h,i));return e}window.makeQR=function(text,size){try{var qr=new b(4,1);qr.addData(text);qr.make();var n=qr.getModuleCount();var cv=document.createElement("canvas");cv.width=cv.height=size;var ctx=cv.getContext("2d");ctx.fillStyle="#fff";ctx.fillRect(0,0,size,size);ctx.fillStyle="#000";var s=size/n;for(var r=0;r<n;r++)for(var c2=0;c2<n;c2++)if(qr.isDark(r,c2))ctx.fillRect(Math.round(c2*s),Math.round(r*s),Math.ceil(s),Math.ceil(s));return cv.toDataURL()}catch(e){return null}};<\/script>`;
+    w.document.write(`<html><head><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;background:#fff;color:#1F2937}.page{max-width:680px;margin:0 auto;padding:40px 32px}.top{display:flex;align-items:center;justify-content:space-between;padding-bottom:20px;border-bottom:3px solid #2563EB;margin-bottom:28px}.brand{display:flex;align-items:center;gap:14px}.brand-name{font-size:32px;font-weight:900}.brand-tag{font-size:13px;color:#6B7280;margin-top:4px;letter-spacing:1px}.co-name{font-size:22px;font-weight:700;color:#2563EB;text-align:right}.co-sub{font-size:13px;color:#9CA3AF;text-align:right;margin-top:2px}.main{display:flex;gap:32px;align-items:flex-start;margin-bottom:28px}.qr-box{flex-shrink:0;text-align:center}.qr-label{font-size:12px;color:#9CA3AF;margin-top:6px}.right{flex:1}.pin-box{background:#EFF6FF;border:2px solid #BFDBFE;border-radius:16px;padding:20px 24px;text-align:center;margin-bottom:20px}.pin-label{font-size:13px;color:#6B7280;font-weight:600;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}.pin{font-size:52px;font-weight:900;color:#2563EB;letter-spacing:14px;line-height:1}.url-box{font-size:18px;font-weight:800;color:#1F2937;background:#F3F4F6;padding:10px 14px;border-radius:8px;margin-bottom:20px;text-align:center}.steps{background:#F9FAFB;border-radius:12px;padding:18px 20px}.steps-title{font-size:14px;font-weight:700;margin-bottom:10px}.steps ol{padding-left:20px}.steps li{font-size:14px;line-height:1.6;margin-bottom:4px}.footer{border-top:1px solid #E5E7EB;padding-top:16px;margin-top:20px;display:flex;justify-content:space-between;align-items:center}.footer-url{font-size:14px;font-weight:700;color:#2563EB}.footer-note{font-size:12px;color:#9CA3AF}.noprint{margin-top:24px;text-align:center}@media print{.noprint{display:none}}</style>${qrScript}</head><body>
     <div class="page">
       <div class="top">
         <div class="brand">
-          <svg width="56" height="56" viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
-            <path d="M8 3.5L36 3.5Q42 3.5 42 9.5L42 25Q42 39 22 43Q2 39 2 25L2 9.5Q2 3.5 8 3.5Z" fill="#2563EB"/>
-            <path d="M11 7L33 7Q38.5 7 38.5 12.5L38.5 24.5Q38.5 36 22 39.5Q5.5 36 5.5 24.5L5.5 12.5Q5.5 7 11 7Z" fill="#1D4ED8"/>
-            <path d="M13 22L19.5 29.5L31 15" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
-            <rect x="12" y="34" width="20" height="8" rx="3" fill="#F59E0B"/>
-            <text x="22" y="40.5" text-anchor="middle" style="fill:#fff;font-size:6px;font-weight:700;font-family:Arial">IQ</text>
-          </svg>
-          <div>
-            <div class="brand-name">Safety<span style="color:#2563EB">IQ</span></div>
-            <div class="brand-tag">STOP · THINK · ACT SAFELY</div>
-          </div>
+          <svg width="56" height="56" viewBox="0 0 44 44"><path d="M8 3.5L36 3.5Q42 3.5 42 9.5L42 25Q42 39 22 43Q2 39 2 25L2 9.5Q2 3.5 8 3.5Z" fill="#2563EB"/><path d="M11 7L33 7Q38.5 7 38.5 12.5L38.5 24.5Q38.5 36 22 39.5Q5.5 36 5.5 24.5L5.5 12.5Q5.5 7 11 7Z" fill="#1D4ED8"/><path d="M13 22L19.5 29.5L31 15" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/><rect x="12" y="34" width="20" height="8" rx="3" fill="#F59E0B"/><text x="22" y="40.5" text-anchor="middle" style="fill:#fff;font-size:6px;font-weight:700;font-family:Arial">IQ</text></svg>
+          <div><div class="brand-name">Safety<span style="color:#2563EB">IQ</span></div><div class="brand-tag">STOP · THINK · ACT SAFELY</div></div>
         </div>
-        <div>
-          <div class="company">${co.name}</div>
-          <div class="company-sub">Site access poster</div>
-        </div>
+        <div><div class="co-name">${co.name}</div><div class="co-sub">Site access poster</div></div>
       </div>
-
       <div class="main">
         <div class="qr-box">
-          <canvas id="qr-canvas" width="220" height="220" style="border-radius:8px;border:2px solid #E5E7EB;display:block"></canvas>
+          <canvas id="qrc" width="220" height="220" style="border:3px solid #E5E7EB;border-radius:12px;display:block"></canvas>
           <div class="qr-label">Scan to open app</div>
         </div>
         <div class="right">
-          <div class="instruction">Scan the QR code with your phone camera, or type the address below into your browser:</div>
-          <div style="font-size:18px;font-weight:800;color:#1F2937;background:#F3F4F6;padding:10px 14px;border-radius:8px;margin-bottom:20px;text-align:center">${url}</div>
-          <div class="pin-box">
-            <div class="pin-label">Your site PIN</div>
-            <div class="pin">${co.pin}</div>
-          </div>
+          <p style="font-size:15px;color:#374151;margin-bottom:16px">Scan the QR code or type the address into your browser:</p>
+          <div class="url-box">${url}</div>
+          <div class="pin-box"><div class="pin-label">Your site PIN</div><div class="pin">${co.pin}</div></div>
         </div>
       </div>
-
       <div class="steps">
         <div class="steps-title">How to complete your Take 5:</div>
         <ol>
           <li>Scan the QR code or go to <strong>${url}</strong></li>
           <li>Enter your 6-digit site PIN: <strong>${co.pin}</strong></li>
-          <li>Complete the pre-task checklist (Step 1)</li>
-          <li>Identify all hazards (Step 2)</li>
-          <li>Assess risk level — SWMS will be triggered if required (Step 3)</li>
-          <li>Complete SWMS if required (Step 4)</li>
-          <li>Sign off and proceed safely (Step 5)</li>
+          <li>Complete the pre-task checklist</li>
+          <li>Select all High Risk tasks that apply</li>
+          <li>Identify hazards and assess risk</li>
+          <li>Complete SWMS if required — then proceed safely</li>
         </ol>
       </div>
-
       <div class="footer">
         <div class="footer-url">${url}</div>
-        <div class="footer-note">PIN: ${co.pin} &nbsp;|&nbsp; ${co.name} &nbsp;|&nbsp; SafetyIQ</div>
+        <div class="footer-note">PIN: ${co.pin} | ${co.name} | SafetyIQ</div>
       </div>
-
-      <div class="noprint">
-        <button onclick="window.print()" style="padding:14px 40px;background:#2563EB;color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer">🖨 Print poster</button>
-      </div>
+      <div class="noprint"><button onclick="window.print()" style="padding:14px 40px;background:#2563EB;color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer">🖨 Print poster</button></div>
     </div>
-    <script>window.onload=function(){var d=window.makeQR("${url}",220);if(d){var c=document.getElementById("qr-canvas");var img=new Image();img.onload=function(){c.getContext("2d").drawImage(img,0,0)};img.src=d}}<\/script>
+    <script>window.onload=function(){var d=window.makeQR("${url}",220);if(d){var cv=document.getElementById("qrc");var img=new Image();img.onload=function(){cv.getContext("2d").drawImage(img,0,0)};img.src=d}}<\/script>
     </body></html>`);
     w.document.close();
   }
@@ -415,30 +436,24 @@ function SettingsPage({ onBack }) {
     <div style={S.app}>
       <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:16, paddingBottom:12, borderBottom:"1px solid #E5E7EB" }}>
         <Logo size={40} />
-        <div style={{ flex:1 }}>
-          <div style={{ fontSize:17, fontWeight:700 }}>⚙ Settings</div>
-          <div style={{ fontSize:12, color:"#6B7280" }}>Company PINs & QR posters</div>
-        </div>
+        <div style={{ flex:1 }}><div style={{ fontSize:17, fontWeight:700 }}>⚙ Settings</div><div style={{ fontSize:12, color:"#6B7280" }}>Company PINs & QR posters</div></div>
         <button style={S.btnSec} onClick={onBack}>← Back</button>
       </div>
-
       <div style={S.divider}>Company PINs</div>
-      <div style={{ fontSize:13, color:"#6B7280", marginBottom:10 }}>Each company gets a unique 6-digit PIN. Workers enter this PIN to access the app — no account needed.</div>
-
+      <div style={{ fontSize:13, color:"#6B7280", marginBottom:10 }}>Each company has a unique 6-digit PIN. Workers enter this to access the app — no account needed.</div>
       {loading && <div style={{ textAlign:"center", padding:24, color:"#6B7280" }}>Loading...</div>}
-
-      {companies.map(co => (
+      {companies.map(co=>(
         <div key={co.id} style={{ ...S.card, marginBottom:8 }}>
           <div style={{ display:"flex", alignItems:"center", gap:10 }} onClick={()=>setOpenId(openId===co.id?null:co.id)}>
             <div style={{ flex:1 }}>
               <div style={{ fontSize:16, fontWeight:700 }}>{co.name}</div>
-              <div style={{ fontSize:20, fontWeight:900, color:"#2563EB", letterSpacing:4, marginTop:2 }}>{co.pin||"No PIN set"}</div>
+              <div style={{ fontSize:22, fontWeight:900, color:"#2563EB", letterSpacing:4, marginTop:2 }}>{co.pin||"No PIN set"}</div>
             </div>
             <span style={{ fontSize:18, color:"#9CA3AF" }}>{openId===co.id?"▲":"▼"}</span>
           </div>
           {openId===co.id && (
             <div style={{ marginTop:12, paddingTop:12, borderTop:"1px solid #E5E7EB" }}>
-              <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+              <div style={{ display:"flex", gap:8 }}>
                 <button style={{ ...S.btnPrim, flex:1, marginTop:0 }} onClick={()=>printQR(co)}>🖨 Print PIN poster</button>
                 <button style={{ ...S.btnSec, flex:1 }} onClick={()=>{ if(confirm("Generate a new PIN? Workers will need the new PIN to log in.")) regeneratePin(co); }}>🔄 New PIN</button>
               </div>
@@ -446,18 +461,14 @@ function SettingsPage({ onBack }) {
           )}
         </div>
       ))}
-
       <div style={S.divider}>Add new company</div>
       <div style={S.card}>
         <div><label style={S.label}>Company name</label><input style={S.input} value={newCo.name} onChange={e=>setNewCo(c=>({...c,name:e.target.value}))} placeholder="e.g. AFJV" /></div>
         <div style={{ marginTop:10, display:"flex", alignItems:"flex-end", gap:8 }}>
-          <div style={{ flex:1 }}>
-            <label style={S.label}>PIN (leave blank to auto-generate)</label>
-            <input style={S.input} value={newCo.pin} onChange={e=>setNewCo(c=>({...c,pin:e.target.value.replace(/\D/g,"").slice(0,6)}))} placeholder="Auto-generated" maxLength={6} />
-          </div>
-          <button style={{ ...S.btnSec, padding:"11px 14px", whiteSpace:"nowrap" }} onClick={()=>setNewCo(c=>({...c,pin:generatePin()}))}>Generate</button>
+          <div style={{ flex:1 }}><label style={S.label}>PIN (leave blank to auto-generate)</label><input style={S.input} value={newCo.pin} onChange={e=>setNewCo(c=>({...c,pin:e.target.value.replace(/\D/g,"").slice(0,6)}))} placeholder="Auto-generated" maxLength={6} /></div>
+          <button style={{ ...S.btnSec, padding:"11px 14px" }} onClick={()=>setNewCo(c=>({...c,pin:generatePin()}))}>Generate</button>
         </div>
-        {msg && <div style={{ marginTop:8, fontSize:13, color:msg.startsWith("Error")?"#B91C1C":"#065F46", padding:"8px 10px", borderRadius:8, background:msg.startsWith("Error")?"#FEE2E2":"#D1FAE5" }}>{msg}</div>}
+        {msg && <div style={{ marginTop:8, fontSize:13, padding:"8px 10px", borderRadius:8, color:msg.startsWith("Error")?"#B91C1C":"#065F46", background:msg.startsWith("Error")?"#FEE2E2":"#D1FAE5" }}>{msg}</div>}
         <button style={S.btnPrim} onClick={addCompany} disabled={saving||!newCo.name}>{saving?"Saving...":"Add company"}</button>
       </div>
     </div>
@@ -472,12 +483,12 @@ function AdminDashboard({ onBack, onSettings, onLogout }) {
   const [tab, setTab] = useState("overview");
   const [filter, setFilter] = useState("all");
 
-  useEffect(() => { loadAll(); }, []);
+  useEffect(()=>{ loadAll(); },[]);
 
   async function loadAll() {
     setLoading(true);
-    const [r, c] = await Promise.all([
-      supabase.from("take5_summary").select("*").order("created_at",{ascending:false}).limit(100),
+    const [r,c] = await Promise.all([
+      supabase.from("take5_records").select("*").order("created_at",{ascending:false}).limit(100),
       supabase.from("companies").select("*").neq("code","ADMIN_MASTER_CODE").order("name"),
     ]);
     setRecords(r.data||[]);
@@ -497,31 +508,20 @@ function AdminDashboard({ onBack, onSettings, onLogout }) {
     <div style={S.app}>
       <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:16, paddingBottom:12, borderBottom:"1px solid #E5E7EB" }}>
         <Logo size={40} />
-        <div style={{ flex:1 }}>
-          <div style={{ fontSize:17, fontWeight:700 }}>Admin dashboard</div>
-          <div style={{ fontSize:12, color:"#6B7280" }}>All companies · All records</div>
-        </div>
-        <button style={{ ...S.btnSec, padding:"7px 12px", fontSize:12 }} onClick={onSettings}>⚙ Settings</button>
+        <div style={{ flex:1 }}><div style={{ fontSize:17, fontWeight:700 }}>Admin dashboard</div><div style={{ fontSize:12, color:"#6B7280" }}>All companies · All records</div></div>
+        <button style={{ ...S.btnSec, padding:"7px 12px", fontSize:12 }} onClick={onSettings}>⚙</button>
         <button style={{ ...S.btnSec, padding:"7px 12px", fontSize:12 }} onClick={onLogout}>Log out</button>
       </div>
-
       <div style={{ display:"flex", gap:4, marginBottom:14, background:"#F3F4F6", borderRadius:10, padding:3 }}>
         {["overview","records"].map(t=>(
           <button key={t} onClick={()=>setTab(t)} style={{ flex:1, padding:"10px", border:"none", borderRadius:8, fontSize:14, fontWeight:600, cursor:"pointer", textTransform:"capitalize", background:tab===t?"#fff":"transparent", color:tab===t?"#2563EB":"#6B7280", boxShadow:tab===t?"0 1px 3px rgba(0,0,0,.1)":"none" }}>{t}</button>
         ))}
       </div>
-
       {loading && <div style={{ textAlign:"center", padding:24, color:"#6B7280" }}>Loading...</div>}
-
       {!loading && tab==="overview" && (
         <>
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:14 }}>
-            {[
-              { label:"Total records", value:records.length, color:"#2563EB" },
-              { label:"SWMS required", value:records.filter(r=>r.result==="swms").length, color:"#DC2626" },
-              { label:"Lift analyses", value:records.filter(r=>r.has_lift_analysis).length, color:"#7C3AED" },
-              { label:"Companies", value:companies.length, color:"#16A34A" },
-            ].map(s=>(
+            {[{label:"Total records",value:records.length,color:"#2563EB"},{label:"SWMS required",value:records.filter(r=>r.result==="swms").length,color:"#DC2626"},{label:"Companies",value:companies.length,color:"#16A34A"},{label:"This week",value:records.filter(r=>new Date(r.created_at)>new Date(Date.now()-7*86400000)).length,color:"#7C3AED"}].map(s=>(
               <div key={s.label} style={{ ...S.card, textAlign:"center", marginBottom:0, padding:"16px 10px" }}>
                 <div style={{ fontSize:30, fontWeight:800, color:s.color }}>{s.value}</div>
                 <div style={{ fontSize:12, color:"#6B7280", marginTop:2 }}>{s.label}</div>
@@ -529,50 +529,45 @@ function AdminDashboard({ onBack, onSettings, onLogout }) {
             ))}
           </div>
           <div style={S.divider}>Recent records</div>
-          {records.slice(0,10).map(r=>(
-            <div key={r.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 0", borderBottom:"1px solid #F9FAFB" }}>
-              <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ fontSize:14, fontWeight:600, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{r.task||r.job_ref||"Untitled"}</div>
-                <div style={{ fontSize:12, color:"#9CA3AF" }}>{r.company_name} · {r.created_at?.slice(0,10)}</div>
+          {records.slice(0,10).map(r=>{
+            const rd = r.record_data||{};
+            return (
+              <div key={r.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 0", borderBottom:"1px solid #F9FAFB" }}>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:14, fontWeight:600, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{r.task||rd.task||r.job_ref||"Untitled"}</div>
+                  <div style={{ fontSize:12, color:"#9CA3AF" }}>{r.created_at?.slice(0,10)}</div>
+                </div>
+                <span style={{ fontSize:11, padding:"3px 8px", borderRadius:5, fontWeight:700, flexShrink:0, background:r.result==="swms"?"#FEE2E2":r.result==="warning"?"#FEF3C7":"#D1FAE5", color:r.result==="swms"?"#B91C1C":r.result==="warning"?"#78350F":"#065F46" }}>{r.result?.toUpperCase()}</span>
               </div>
-              <span style={{ fontSize:11, padding:"3px 8px", borderRadius:5, fontWeight:700, flexShrink:0,
-                background:r.result==="swms"?"#FEE2E2":r.result==="warning"?"#FEF3C7":"#D1FAE5",
-                color:r.result==="swms"?"#B91C1C":r.result==="warning"?"#78350F":"#065F46" }}>
-                {r.result?.toUpperCase()}
-              </span>
-            </div>
-          ))}
+            );
+          })}
         </>
       )}
-
       {!loading && tab==="records" && (
         <>
           <div style={{ display:"flex", gap:6, marginBottom:12, flexWrap:"wrap" }}>
             {["all","safe","warning","swms"].map(f=>(
-              <button key={f} onClick={()=>setFilter(f)} style={{ padding:"8px 14px", border:"1px solid #E5E7EB", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer", background:filter===f?"#2563EB":"#F9FAFB", color:filter===f?"#fff":"#374151", textTransform:"capitalize" }}>
-                {f==="all"?"All":f.toUpperCase()}
-              </button>
+              <button key={f} onClick={()=>setFilter(f)} style={{ padding:"8px 14px", border:"1px solid #E5E7EB", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer", background:filter===f?"#2563EB":"#F9FAFB", color:filter===f?"#fff":"#374151", textTransform:"capitalize" }}>{f==="all"?"All":f.toUpperCase()}</button>
             ))}
           </div>
-          {filtered.map(r=>(
-            <div key={r.id} style={{ ...S.card, marginBottom:6 }}>
-              <div style={{ display:"flex", alignItems:"flex-start", gap:8 }}>
-                <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontSize:14, fontWeight:600 }}>{r.task||r.job_ref||"Untitled"}</div>
-                  <div style={{ fontSize:12, color:"#6B7280" }}>{r.company_name} · {r.location||"No location"}</div>
-                  <div style={{ fontSize:12, color:"#9CA3AF" }}>{r.created_at?.slice(0,10)} {r.created_at?.slice(11,16)}</div>
-                </div>
-                <div style={{ display:"flex", flexDirection:"column", gap:6, flexShrink:0, alignItems:"flex-end" }}>
-                  <span style={{ fontSize:11, padding:"3px 8px", borderRadius:5, fontWeight:700,
-                    background:r.result==="swms"?"#FEE2E2":r.result==="warning"?"#FEF3C7":"#D1FAE5",
-                    color:r.result==="swms"?"#B91C1C":r.result==="warning"?"#78350F":"#065F46" }}>
-                    {r.result?.toUpperCase()}
-                  </span>
-                  <button style={S.btnDanger} onClick={()=>deleteRecord(r.id)}>Delete</button>
+          {filtered.map(r=>{
+            const rd = r.record_data||{};
+            return (
+              <div key={r.id} style={{ ...S.card, marginBottom:6 }}>
+                <div style={{ display:"flex", alignItems:"flex-start", gap:8 }}>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:14, fontWeight:600 }}>{r.task||rd.task||r.job_ref||"Untitled"}</div>
+                    <div style={{ fontSize:12, color:"#6B7280" }}>{r.location||rd.location||"No location"}</div>
+                    <div style={{ fontSize:12, color:"#9CA3AF" }}>{r.created_at?.slice(0,10)} {r.created_at?.slice(11,16)}</div>
+                  </div>
+                  <div style={{ display:"flex", flexDirection:"column", gap:6, flexShrink:0, alignItems:"flex-end" }}>
+                    <span style={{ fontSize:11, padding:"3px 8px", borderRadius:5, fontWeight:700, background:r.result==="swms"?"#FEE2E2":r.result==="warning"?"#FEF3C7":"#D1FAE5", color:r.result==="swms"?"#B91C1C":r.result==="warning"?"#78350F":"#065F46" }}>{r.result?.toUpperCase()}</span>
+                    <button style={S.btnDanger} onClick={()=>deleteRecord(r.id)}>Delete</button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </>
       )}
     </div>
@@ -585,7 +580,7 @@ function RecordsView({ companyId, companyName, onBack, onNew }) {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
 
-  useEffect(()=>{ loadRecords(); }, [filter]);
+  useEffect(()=>{ loadRecords(); },[filter]);
 
   async function loadRecords() {
     setLoading(true);
@@ -600,22 +595,17 @@ function RecordsView({ companyId, companyName, onBack, onNew }) {
     <div style={S.app}>
       <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:14, paddingBottom:12, borderBottom:"1px solid #E5E7EB" }}>
         <Logo size={40} />
-        <div style={{ flex:1 }}>
-          <div style={{ fontSize:17, fontWeight:700 }}>Records</div>
-          <div style={{ fontSize:12, color:"#6B7280" }}>{companyName}</div>
-        </div>
+        <div style={{ flex:1 }}><div style={{ fontSize:17, fontWeight:700 }}>Records</div><div style={{ fontSize:12, color:"#6B7280" }}>{companyName}</div></div>
         <button style={{ ...S.btnPrim, width:"auto", marginTop:0, padding:"9px 14px", fontSize:13 }} onClick={onNew}>+ New</button>
         <button style={S.btnSec} onClick={onBack}>← Back</button>
       </div>
       <div style={{ display:"flex", gap:6, marginBottom:12, flexWrap:"wrap" }}>
         {["all","safe","warning","swms"].map(f=>(
-          <button key={f} onClick={()=>setFilter(f)} style={{ padding:"8px 14px", border:"1px solid #E5E7EB", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer", background:filter===f?"#2563EB":"#F9FAFB", color:filter===f?"#fff":"#374151" }}>
-            {f==="all"?"All":f.toUpperCase()}
-          </button>
+          <button key={f} onClick={()=>setFilter(f)} style={{ padding:"8px 14px", border:"1px solid #E5E7EB", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer", background:filter===f?"#2563EB":"#F9FAFB", color:filter===f?"#fff":"#374151" }}>{f==="all"?"All":f.toUpperCase()}</button>
         ))}
       </div>
       {loading && <div style={{ textAlign:"center", padding:24, color:"#6B7280" }}>Loading...</div>}
-      {!loading && records.length===0 && <div style={{ textAlign:"center", padding:40, color:"#6B7280", fontSize:14 }}>No records yet.<br/>Complete a Take 5 to get started.</div>}
+      {!loading && records.length===0 && <div style={{ textAlign:"center", padding:40, color:"#6B7280", fontSize:14 }}>No records yet.</div>}
       {!loading && records.map(r=>{
         const rd = r.record_data||{};
         return (
@@ -626,11 +616,7 @@ function RecordsView({ companyId, companyName, onBack, onNew }) {
                 <div style={{ fontSize:13, color:"#6B7280", marginTop:2 }}>{r.location||rd.location||"No location"}</div>
                 <div style={{ fontSize:12, color:"#9CA3AF" }}>{r.created_at?.slice(0,10)} {r.created_at?.slice(11,16)}</div>
               </div>
-              <span style={{ fontSize:12, padding:"4px 10px", borderRadius:6, fontWeight:700, flexShrink:0,
-                background:r.result==="swms"?"#FEE2E2":r.result==="warning"?"#FEF3C7":"#D1FAE5",
-                color:r.result==="swms"?"#B91C1C":r.result==="warning"?"#78350F":"#065F46" }}>
-                {r.result?.toUpperCase()}
-              </span>
+              <span style={{ fontSize:12, padding:"4px 10px", borderRadius:6, fontWeight:700, flexShrink:0, background:r.result==="swms"?"#FEE2E2":r.result==="warning"?"#FEF3C7":"#D1FAE5", color:r.result==="swms"?"#B91C1C":r.result==="warning"?"#78350F":"#065F46" }}>{r.result?.toUpperCase()}</span>
             </div>
           </div>
         );
@@ -642,11 +628,13 @@ function RecordsView({ companyId, companyName, onBack, onNew }) {
 // ── MAIN TAKE 5 APP ───────────────────────────────────────────────────────────
 function Take5App({ company, onExit }) {
   const [screen, setScreen] = useState("setup");
-  const [form, setForm] = useState({ jobRef:"", location:"", date:new Date().toISOString().slice(0,10), time:new Date().toTimeString().slice(0,5), task:"" });
+  const [form, setForm] = useState({ jobRef:"", location:"", date:new Date().toISOString().slice(0,10), time:new Date().toTimeString().slice(0,5), task:"", machineEquipment:"" });
   const [step1, setStep1] = useState({});
+  const [hrcwSelected, setHrcwSelected] = useState({});
   const [hazards, setHazards] = useState({});
   const [liftChecks, setLiftChecks] = useState({});
   const [liftDetails, setLiftDetails] = useState({ load:"", weight:"", crane:"", radius:"" });
+  const [csChecks, setCsChecks] = useState({});
   const [swmsHazards, setSwmsHazards] = useState([{ id:1, hazard:"", initialL:"", initialC:"", controls:"", responsible:"", residualL:"", residualC:"" }]);
   const [sigWorker, setSigWorker] = useState("");
   const [sigSupervisor, setSigSupervisor] = useState("");
@@ -656,28 +644,45 @@ function Take5App({ company, onExit }) {
 
   const setF = k => e => setForm(f=>({...f,[k]:e.target.value}));
 
+  const selectedHrcw = HRCW_TASKS.filter(t=>hrcwSelected[t.id] && t.id!=="hrcw_none");
+  const needsLift = selectedHrcw.some(t=>t.triggerLift);
+  const needsCS = selectedHrcw.some(t=>t.triggerConfinedSpace);
+  const hrcwNone = hrcwSelected["hrcw_none"];
+  const anyHrcwSelected = Object.values(hrcwSelected).some(v=>v);
+
   function calcResult() {
-    const swmsTrigger = STEP1_CHECKS.filter(c=>c.swmsTrigger).some(c=>step1[c.id]==="yes");
-    const noBasics = ["s1_4","s1_5","s1_7"].some(id=>step1[id]==="no");
+    const noBasics = ["s1_5","s1_6"].some(id=>step1[id]==="no");
+    const hrcwTriggered = selectedHrcw.length > 0;
+    const s1swms = STEP1_CHECKS.filter(c=>c.swmsTrigger).some(c=>step1[c.id]==="yes");
     const highHaz = HAZARDS.filter(h=>h.weight==="high").some(h=>hazards[h.id]);
     const medCount = HAZARDS.filter(h=>h.weight==="medium").filter(h=>hazards[h.id]).length;
-    if (swmsTrigger||highHaz||noBasics) return "swms";
+    if (noBasics||hrcwTriggered||s1swms||highHaz) return "swms";
     if (medCount>=1) return "warning";
     return "safe";
   }
 
-  function needsLift() { return hazards["h_lift"]||hazards["h_gr"]||hazards["h_mech"]; }
   function step1Done() { return STEP1_CHECKS.every(c=>step1[c.id]!==undefined); }
+
+  // Determine which extra screens are needed
+  function getNextAfterHrcw() {
+    if (needsLift) return "lift";
+    if (needsCS) return "confined";
+    return "step3";
+  }
+
+  function getNextAfterLift() {
+    if (needsCS) return "confined";
+    return "step3";
+  }
 
   async function saveToCloud() {
     setSaving(true); setCloudMsg("");
     const result = calcResult();
     const rec = {
       job_ref:form.jobRef, task:form.task, location:form.location,
-      company_id:company.company_id,
-      result,
+      company_id:company.company_id, result,
       created_at:form.date+"T"+form.time,
-      record_data:{ ...form, step1, hazards:Object.keys(hazards).filter(k=>hazards[k]), liftChecks, liftDetails, swmsHazards, sigWorker, sigSupervisor },
+      record_data:{ ...form, step1, hrcwSelected, hazards:Object.keys(hazards).filter(k=>hazards[k]), liftChecks, liftDetails, csChecks, swmsHazards, sigWorker, sigSupervisor },
     };
     const { data, error } = await supabase.from("take5_records").insert(rec).select().single();
     if (error) setCloudMsg("Save failed: "+error.message);
@@ -686,23 +691,22 @@ function Take5App({ company, onExit }) {
   }
 
   function exportPDF() {
-    const rec = { ...form, step1, hazards:Object.keys(hazards).filter(k=>hazards[k]), liftChecks, liftDetails, swmsHazards, sigWorker, sigSupervisor, result:calcResult() };
+    const rec = { ...form, step1, hrcwSelected, hazards:Object.keys(hazards).filter(k=>hazards[k]), liftChecks, liftDetails, csChecks, swmsHazards, sigWorker, sigSupervisor, result:calcResult() };
     const w = window.open("","_blank","width=900,height=700");
     if(w){ w.document.write(buildPDF(rec, company.company_name)); w.document.close(); setTimeout(()=>w.print(),600); }
   }
 
   function reset() {
-    setScreen("setup"); setStep1({}); setHazards({}); setLiftChecks({});
+    setScreen("setup"); setStep1({}); setHrcwSelected({}); setHazards({}); setLiftChecks({}); setCsChecks({});
     setLiftDetails({load:"",weight:"",crane:"",radius:""});
     setSwmsHazards([{id:1,hazard:"",initialL:"",initialC:"",controls:"",responsible:"",residualL:"",residualC:""}]);
     setSavedId(null); setCloudMsg(""); setSigWorker(""); setSigSupervisor("");
-    setForm({jobRef:"",location:"",date:new Date().toISOString().slice(0,10),time:new Date().toTimeString().slice(0,5),task:""});
+    setForm({jobRef:"",location:"",date:new Date().toISOString().slice(0,10),time:new Date().toTimeString().slice(0,5),task:"",machineEquipment:""});
   }
 
   const result = calcResult();
   const selectedHazards = HAZARDS.filter(h=>hazards[h.id]);
 
-  // App header
   const hdr = (
     <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:14, paddingBottom:12, borderBottom:"1px solid #E5E7EB" }}>
       <Logo size={40} />
@@ -716,17 +720,18 @@ function Take5App({ company, onExit }) {
 
   if (screen==="records") return <RecordsView companyId={company.company_id} companyName={company.company_name} onBack={()=>setScreen("setup")} onNew={reset} />;
 
-  // SETUP
+  // ── SETUP
   if (screen==="setup") return (
     <div style={S.app}>
       {hdr}
       <Pips active={0} />
       <div style={S.stepLbl}>Setup — job details</div>
       <div style={S.card}>
-        <div><label style={S.label}>Task description</label><input style={S.input} value={form.task} onChange={setF("task")} placeholder="Brief description of the task" /></div>
-        <div style={{marginTop:10}}><label style={S.label}>Location</label><input style={S.input} value={form.location} onChange={setF("location")} placeholder="e.g. Ring 450, TBM Level" /></div>
+        <div><label style={S.label}>Task / job description</label><input style={S.input} value={form.task} onChange={setF("task")} placeholder="e.g. Replace hydraulic hose on TBM thrust cylinder" /></div>
+        <div style={{marginTop:10}}><label style={S.label}>Machine / equipment</label><input style={S.input} value={form.machineEquipment} onChange={setF("machineEquipment")} placeholder="e.g. TBM S-1000, Segment Feeder Crane" /></div>
+        <div style={{marginTop:10}}><label style={S.label}>Location / area</label><input style={S.input} value={form.location} onChange={setF("location")} placeholder="e.g. Workshop Bay 3, Ring 450" /></div>
         <div style={S.grid2}>
-          <div><label style={S.label}>Job reference</label><input style={S.input} value={form.jobRef} onChange={setF("jobRef")} placeholder="e.g. SMW-001" /></div>
+          <div><label style={S.label}>Job / work order ref</label><input style={S.input} value={form.jobRef} onChange={setF("jobRef")} placeholder="e.g. WO-2025-001" /></div>
           <div><label style={S.label}>Date</label><input style={S.input} type="date" value={form.date} onChange={setF("date")} /></div>
         </div>
         <div style={{marginTop:10}}><label style={S.label}>Time</label><input style={{...S.input,maxWidth:160}} type="time" value={form.time} onChange={setF("time")} /></div>
@@ -736,13 +741,13 @@ function Take5App({ company, onExit }) {
     </div>
   );
 
-  // STEP 1
+  // ── STEP 1
   if (screen==="step1") return (
     <div style={S.app}>
       {hdr}
       <Pips active={1} />
       <div style={S.stepLbl}>Step 1 — Stop, step back and think</div>
-      <div style={S.secSub}>Answer honestly before starting work.</div>
+      <div style={S.secSub}>Answer all questions honestly before starting work. A YES to a trigger question requires a SWMS.</div>
       <div style={S.card}>
         {STEP1_CHECKS.map(c=>{
           const ans = step1[c.id];
@@ -750,7 +755,7 @@ function Take5App({ company, onExit }) {
             <div key={c.id} style={{padding:"12px 0",borderBottom:"1px solid #F3F4F6"}}>
               <div style={{fontSize:15,color:"#1F2937",lineHeight:1.5,marginBottom:8}}>
                 {c.text}
-                {c.swmsTrigger && <span style={{fontSize:10,color:"#DC2626",fontWeight:700,marginLeft:6,background:"#FEE2E2",padding:"2px 6px",borderRadius:4}}>SWMS</span>}
+                {c.swmsTrigger && <span style={{fontSize:10,color:"#DC2626",fontWeight:700,marginLeft:6,background:"#FEE2E2",padding:"2px 6px",borderRadius:4}}>SWMS TRIGGER</span>}
               </div>
               <div style={{display:"flex",gap:8}}>
                 {["yes","no"].map(v=>(
@@ -767,78 +772,76 @@ function Take5App({ company, onExit }) {
           );
         })}
       </div>
-      <button style={{...S.btnPrim,opacity:step1Done()?1:.4}} disabled={!step1Done()} onClick={()=>setScreen("step2")}>Identify hazards →</button>
+      <button style={{...S.btnPrim,opacity:step1Done()?1:.4}} disabled={!step1Done()} onClick={()=>setScreen("step2")}>Select high risk tasks →</button>
       <button style={{...S.btnSec,width:"100%",textAlign:"center",marginTop:8}} onClick={()=>setScreen("setup")}>← Back</button>
     </div>
   );
 
-  // STEP 2
+  // ── STEP 2: HRCW SELECTOR
   if (screen==="step2") return (
     <div style={S.app}>
       {hdr}
       <Pips active={2} />
-      <div style={S.stepLbl}>Step 2 — Identify the hazard(s)</div>
-      <div style={S.secSub}>Select all hazard types that apply. <strong>Bold = high risk.</strong></div>
-      <div style={S.card}>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-          {HAZARDS.map(h=>(
-            <button key={h.id} onClick={()=>setHazards(p=>({...p,nil:false,[h.id]:!p[h.id]}))}
-              style={{border:"2px solid",borderRadius:10,padding:"12px 10px",textAlign:"left",cursor:"pointer",lineHeight:1.3,minHeight:64,
-                background:hazards[h.id]?"#FEF2F2":"#F9FAFB",borderColor:hazards[h.id]?"#EF4444":"#E5E7EB"}}>
-              <div style={{fontSize:14,fontWeight:h.weight==="high"?700:500,color:hazards[h.id]?"#B91C1C":"#374151"}}>{h.label}</div>
-              <div style={{fontSize:11,color:hazards[h.id]?"#EF4444":"#9CA3AF",marginTop:3,lineHeight:1.3}}>{h.sub}</div>
+      <div style={S.stepLbl}>Step 2 — High risk construction work</div>
+      <div style={S.secSub}>Select <strong>all</strong> high risk tasks that apply to this job. Each triggers the required permits and checks.</div>
+      <div style={{ display:"flex", flexDirection:"column", gap:8, marginBottom:10 }}>
+        {HRCW_TASKS.map(t=>{
+          const on = hrcwSelected[t.id];
+          const isNone = t.id==="hrcw_none";
+          return (
+            <button key={t.id} onClick={()=>{
+              if (isNone) setHrcwSelected({hrcw_none:!hrcwSelected.hrcw_none});
+              else setHrcwSelected(p=>({...p,hrcw_none:false,[t.id]:!p[t.id]}));
+            }}
+              style={{ border:"2px solid", borderRadius:12, padding:"14px", textAlign:"left", cursor:"pointer",
+                background:on?(isNone?"#F0FDF4":"#FEF2F2"):"#fff",
+                borderColor:on?(isNone?"#86EFAC":"#EF4444"):"#E5E7EB",
+                boxShadow:"0 1px 3px rgba(0,0,0,.05)" }}>
+              <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                <span style={{ fontSize:24 }}>{t.icon}</span>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:15, fontWeight:700, color:on?(isNone?"#15803D":"#B91C1C"):"#1F2937" }}>{t.label}</div>
+                  <div style={{ fontSize:12, color:on?(isNone?"#166534":"#EF4444"):"#9CA3AF", marginTop:2, lineHeight:1.4 }}>{t.sub}</div>
+                </div>
+                <div style={{ width:24, height:24, borderRadius:6, border:"2px solid", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0,
+                  background:on?(isNone?"#22C55E":"#EF4444"):"#fff",
+                  borderColor:on?(isNone?"#22C55E":"#EF4444"):"#D1D5DB" }}>
+                  {on && <span style={{ color:"#fff", fontSize:14, fontWeight:700 }}>✓</span>}
+                </div>
+              </div>
+              {on && !isNone && t.permits.length>0 && (
+                <div style={{ marginTop:10, paddingTop:10, borderTop:"1px solid #FEE2E2" }}>
+                  {t.permits.map((p,i)=>(
+                    <div key={i} style={{ fontSize:12, color:"#B91C1C", display:"flex", alignItems:"flex-start", gap:6, marginBottom:4 }}>
+                      <span style={{ flexShrink:0, marginTop:1 }}>⚠</span><span>{p}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </button>
-          ))}
-        </div>
-        <button onClick={()=>setHazards({nil:!hazards.nil})}
-          style={{width:"100%",padding:"12px",border:"2px solid",borderRadius:10,fontSize:14,fontWeight:600,cursor:"pointer",marginTop:10,
-            background:hazards.nil?"#EFF6FF":"#F9FAFB",color:hazards.nil?"#2563EB":"#6B7280",borderColor:hazards.nil?"#93C5FD":"#E5E7EB"}}>
-          ✓ Nil hazards — none of the above apply
-        </button>
+          );
+        })}
       </div>
-      <button style={S.btnPrim} onClick={()=>setScreen("step3")}>Assess risk →</button>
+      {selectedHrcw.length>0 && (
+        <div style={{ padding:"12px 14px", borderRadius:10, background:"#FEF2F2", border:"1px solid #FCA5A5", marginBottom:10 }}>
+          <div style={{ fontSize:13, fontWeight:700, color:"#B91C1C", marginBottom:4 }}>SWMS required for this task</div>
+          <div style={{ fontSize:12, color:"#991B1B" }}>{selectedHrcw.map(t=>t.label).join(" · ")}</div>
+        </div>
+      )}
+      <button style={{...S.btnPrim,opacity:anyHrcwSelected?1:.4}} disabled={!anyHrcwSelected} onClick={()=>setScreen(hrcwNone?"step3":getNextAfterHrcw())}>
+        {hrcwNone?"Continue to hazard identification →":needsLift?"Complete lift risk analysis →":needsCS?"Complete confined space checklist →":"Continue to hazard identification →"}
+      </button>
       <button style={{...S.btnSec,width:"100%",textAlign:"center",marginTop:8}} onClick={()=>setScreen("step1")}>← Back</button>
     </div>
   );
 
-  // STEP 3
-  if (screen==="step3") return (
-    <div style={S.app}>
-      {hdr}
-      <Pips active={3} />
-      <div style={S.stepLbl}>Step 3 — Assess level of risk</div>
-      <div style={{borderRadius:12,padding:"14px",marginBottom:10,border:"2px solid",
-        background:result==="safe"?"#F0FDF4":result==="warning"?"#FFFBEB":"#FEF2F2",
-        borderColor:result==="safe"?"#86EFAC":result==="warning"?"#FCD34D":"#FCA5A5"}}>
-        <div style={{fontSize:17,fontWeight:700,color:result==="safe"?"#15803D":result==="warning"?"#92400E":"#B91C1C"}}>
-          {result==="safe"?"✓ Proceed safely":result==="warning"?"⚠ Additional controls required":"✕ SWMS required — do not proceed"}
-        </div>
-        <div style={{fontSize:14,marginTop:4,lineHeight:1.5,color:result==="safe"?"#166534":result==="warning"?"#78350F":"#991B1B"}}>
-          {result==="safe"?"No high-risk hazards identified. Apply standard controls and PPE.":result==="warning"?"Hazards identified. Apply hierarchy of controls before proceeding.":"High-risk activity identified. Complete and sign a SWMS before work commences."}
-        </div>
-      </div>
-      {selectedHazards.length>0 && selectedHazards.map(h=>(
-        <div key={h.id} style={{fontSize:14,padding:"8px 0",borderBottom:"1px solid #F3F4F6",color:"#374151",display:"flex",alignItems:"center",gap:8}}>
-          <span style={{color:h.weight==="high"?"#EF4444":"#F59E0B",fontSize:16}}>●</span>
-          <strong>{h.label}</strong> — {h.sub}
-        </div>
-      ))}
-      <div style={{marginTop:14,display:"flex",flexDirection:"column",gap:8}}>
-        {needsLift() && <button style={S.btnPrim} onClick={()=>setScreen("lift")} >🏗 Complete lift risk analysis</button>}
-        {result==="swms" ? <button style={S.btnPrim} onClick={()=>setScreen("swms")}>Complete SWMS →</button>
-          : <button style={S.btnPrim} onClick={()=>setScreen("complete")}>Sign off →</button>}
-        <button style={{...S.btnSec,textAlign:"center"}} onClick={()=>setScreen("step2")}>← Back</button>
-      </div>
-    </div>
-  );
-
-  // LIFT
+  // ── LIFT ANALYSIS
   if (screen==="lift") return (
     <div style={S.app}>
       {hdr}
       <Pips active={3} />
       <div style={S.stepLbl}>Lift risk analysis</div>
-      <div style={S.secSub}>Complete all items before any lifting operation. A "No" stops the lift.</div>
+      <div style={S.secSub}>Complete all items before any lifting operation. A "No" answer stops the lift.</div>
       <div style={S.card}>
         {LIFT_CHECKS.map((lc,i)=>{
           const ans = liftChecks[i];
@@ -861,31 +864,101 @@ function Take5App({ company, onExit }) {
         })}
       </div>
       <div style={{...S.card,background:"#F5F3FF",border:"2px solid #DDD6FE"}}>
-        <div style={{fontSize:14,fontWeight:700,color:"#7C3AED",marginBottom:10}}>Load details</div>
-        <div><label style={S.label}>Load description</label><input style={S.input} value={liftDetails.load} onChange={e=>setLiftDetails(p=>({...p,load:e.target.value}))} placeholder="e.g. Hydraulic pump assembly" /></div>
+        <div style={{fontSize:14,fontWeight:700,color:"#7C3AED",marginBottom:10}}>🏗 Load details</div>
+        <div><label style={S.label}>Load description</label><input style={S.input} value={liftDetails.load} onChange={e=>setLiftDetails(p=>({...p,load:e.target.value}))} placeholder="e.g. TBM thrust cylinder assembly" /></div>
         <div style={S.grid2}>
-          <div><label style={S.label}>Weight (t)</label><input style={S.input} type="number" value={liftDetails.weight} onChange={e=>setLiftDetails(p=>({...p,weight:e.target.value}))} placeholder="2.5" /></div>
-          <div><label style={S.label}>Radius (m)</label><input style={S.input} type="number" value={liftDetails.radius} onChange={e=>setLiftDetails(p=>({...p,radius:e.target.value}))} placeholder="12" /></div>
+          <div><label style={S.label}>Weight (tonnes)</label><input style={S.input} type="number" value={liftDetails.weight} onChange={e=>setLiftDetails(p=>({...p,weight:e.target.value}))} placeholder="e.g. 2.5" /></div>
+          <div><label style={S.label}>Lift radius (m)</label><input style={S.input} type="number" value={liftDetails.radius} onChange={e=>setLiftDetails(p=>({...p,radius:e.target.value}))} placeholder="e.g. 4" /></div>
         </div>
-        <div style={{marginTop:10}}><label style={S.label}>Crane / equipment</label><input style={S.input} value={liftDetails.crane} onChange={e=>setLiftDetails(p=>({...p,crane:e.target.value}))} placeholder="e.g. 50t mobile crane" /></div>
+        <div style={{marginTop:10}}><label style={S.label}>Crane / lifting equipment</label><input style={S.input} value={liftDetails.crane} onChange={e=>setLiftDetails(p=>({...p,crane:e.target.value}))} placeholder="e.g. 20t overhead gantry, chain block" /></div>
       </div>
       {Object.values(liftChecks).some(v=>v==="no") && (
-        <div style={{borderRadius:12,padding:"12px 14px",background:"#FEF2F2",border:"2px solid #FCA5A5",marginBottom:10,fontSize:14,color:"#B91C1C",fontWeight:700}}>
-          ✕ Lift must not proceed — resolve all "No" items first.
-        </div>
+        <div style={{borderRadius:12,padding:"12px 14px",background:"#FEF2F2",border:"2px solid #FCA5A5",marginBottom:10,fontSize:14,color:"#B91C1C",fontWeight:700}}>✕ Lift must not proceed — resolve all "No" items first.</div>
       )}
-      <button style={S.btnPrim} onClick={()=>setScreen(result==="swms"?"swms":"complete")}>Continue →</button>
-      <button style={{...S.btnSec,width:"100%",textAlign:"center",marginTop:8}} onClick={()=>setScreen("step3")}>← Back</button>
+      <button style={S.btnPrim} onClick={()=>setScreen(getNextAfterLift())}>Continue →</button>
+      <button style={{...S.btnSec,width:"100%",textAlign:"center",marginTop:8}} onClick={()=>setScreen("step2")}>← Back</button>
     </div>
   );
 
-  // SWMS
-  if (screen==="swms") return (
+  // ── CONFINED SPACE CHECKLIST
+  if (screen==="confined") return (
+    <div style={S.app}>
+      {hdr}
+      <Pips active={3} />
+      <div style={S.stepLbl}>Confined space pre-entry checklist</div>
+      <div style={S.secSub}>All items must be confirmed before any person enters the confined space.</div>
+      <div style={S.card}>
+        {CONFINED_SPACE_CHECKS.map((cc,i)=>{
+          const ans = csChecks[i];
+          return (
+            <div key={i} style={{padding:"12px 0",borderBottom:"1px solid #F3F4F6"}}>
+              <div style={{fontSize:15,color:"#1F2937",lineHeight:1.5,marginBottom:8}}>{cc}</div>
+              <div style={{display:"flex",gap:8}}>
+                {["yes","no","na"].map(v=>(
+                  <button key={v} onClick={()=>setCsChecks(p=>({...p,[i]:v}))}
+                    style={{flex:1,padding:"11px",borderRadius:10,border:"2px solid",fontSize:14,fontWeight:700,cursor:"pointer",
+                      background:ans===v?(v==="no"?"#FEE2E2":v==="yes"?"#D1FAE5":"#EFF6FF"):"#F9FAFB",
+                      color:ans===v?(v==="no"?"#B91C1C":v==="yes"?"#065F46":"#2563EB"):"#6B7280",
+                      borderColor:ans===v?(v==="no"?"#FCA5A5":v==="yes"?"#86EFAC":"#93C5FD"):"#E5E7EB"}}>
+                    {v.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {Object.values(csChecks).some(v=>v==="no") && (
+        <div style={{borderRadius:12,padding:"12px 14px",background:"#FEF2F2",border:"2px solid #FCA5A5",marginBottom:10,fontSize:14,color:"#B91C1C",fontWeight:700}}>✕ Entry must not proceed — resolve all "No" items first.</div>
+      )}
+      <button style={S.btnPrim} onClick={()=>setScreen("step3")}>Continue to hazard identification →</button>
+      <button style={{...S.btnSec,width:"100%",textAlign:"center",marginTop:8}} onClick={()=>setScreen(needsLift?"lift":"step2")}>← Back</button>
+    </div>
+  );
+
+  // ── STEP 3: HAZARD ID
+  if (screen==="step3") return (
     <div style={S.app}>
       {hdr}
       <Pips active={4} />
+      <div style={S.stepLbl}>Step 3 — Identify all hazards</div>
+      <div style={S.secSub}>Select every hazard present for this task. Bold = high risk — always requires SWMS.</div>
+      <div style={S.card}>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+          {HAZARDS.map(h=>(
+            <button key={h.id} onClick={()=>setHazards(p=>({...p,[h.id]:!p[h.id]}))}
+              style={{border:"2px solid",borderRadius:10,padding:"12px 10px",textAlign:"left",cursor:"pointer",lineHeight:1.3,minHeight:64,
+                background:hazards[h.id]?"#FEF2F2":"#F9FAFB",borderColor:hazards[h.id]?"#EF4444":"#E5E7EB"}}>
+              <div style={{fontSize:14,fontWeight:h.weight==="high"?700:500,color:hazards[h.id]?"#B91C1C":"#374151"}}>{h.label}</div>
+              <div style={{fontSize:11,color:hazards[h.id]?"#EF4444":"#9CA3AF",marginTop:3,lineHeight:1.3}}>{h.sub}</div>
+            </button>
+          ))}
+        </div>
+      </div>
+      <div style={{borderRadius:12,padding:"14px",marginBottom:10,border:"2px solid",
+        background:result==="safe"?"#F0FDF4":result==="warning"?"#FFFBEB":"#FEF2F2",
+        borderColor:result==="safe"?"#86EFAC":result==="warning"?"#FCD34D":"#FCA5A5"}}>
+        <div style={{fontSize:16,fontWeight:700,color:result==="safe"?"#15803D":result==="warning"?"#92400E":"#B91C1C"}}>
+          {result==="safe"?"✓ Proceed safely":result==="warning"?"⚠ Additional controls required":"✕ SWMS required — do not proceed"}
+        </div>
+        <div style={{fontSize:14,marginTop:4,lineHeight:1.5,color:result==="safe"?"#166534":result==="warning"?"#78350F":"#991B1B"}}>
+          {result==="safe"?"No high-risk hazards identified. Apply standard controls and PPE.":result==="warning"?"Hazards identified. Review and apply controls before proceeding.":"High-risk activity or hazard identified. Complete SWMS before work commences."}
+        </div>
+      </div>
+      {result==="swms"
+        ? <button style={S.btnPrim} onClick={()=>setScreen("swms")}>Complete SWMS →</button>
+        : <button style={S.btnPrim} onClick={()=>setScreen("complete")}>Sign off →</button>}
+      <button style={{...S.btnSec,width:"100%",textAlign:"center",marginTop:8}} onClick={()=>setScreen(needsCS?"confined":needsLift?"lift":"step2")}>← Back</button>
+    </div>
+  );
+
+  // ── SWMS
+  if (screen==="swms") return (
+    <div style={S.app}>
+      {hdr}
+      <Pips active={5} />
       <div style={S.stepLbl}>Step 4 — Safe Work Method Statement</div>
-      <div style={S.secSub}>Document each hazard with risk ratings, control measures and responsible person.</div>
+      <div style={S.secSub}>Document each hazard, risk ratings, control measures and responsible person.</div>
       <div style={S.card}>
         <div><label style={S.label}>Task</label><input style={S.input} value={form.task} onChange={setF("task")} /></div>
         <div style={S.grid2}>
@@ -893,6 +966,17 @@ function Take5App({ company, onExit }) {
           <div><label style={S.label}>Date</label><input style={S.input} type="date" value={form.date} onChange={setF("date")} /></div>
         </div>
       </div>
+      {/* Show permit reminders for selected HRCW */}
+      {selectedHrcw.length>0 && (
+        <div style={{...S.card,background:"#FFF7ED",border:"1px solid #FED7AA"}}>
+          <div style={{fontSize:13,fontWeight:700,color:"#92400E",marginBottom:8}}>⚠ Permit requirements for this task</div>
+          {selectedHrcw.map(t=>t.permits.map((p,i)=>(
+            <div key={t.id+i} style={{fontSize:13,color:"#92400E",padding:"4px 0",borderBottom:"1px solid #FED7AA",display:"flex",gap:8}}>
+              <span style={{flexShrink:0}}>•</span><span><strong>{t.label}:</strong> {p}</span>
+            </div>
+          )))}
+        </div>
+      )}
       {swmsHazards.map((h,i)=>{
         const ir = h.initialL!==""&&h.initialC!==""?matrixRating(parseInt(h.initialL),parseInt(h.initialC)):null;
         const rr = h.residualL!==""&&h.residualC!==""?matrixRating(parseInt(h.residualL),parseInt(h.residualC)):null;
@@ -900,15 +984,16 @@ function Take5App({ company, onExit }) {
           <div key={h.id} style={{...S.card,position:"relative",border:"2px solid #E5E7EB"}}>
             <button onClick={()=>setSwmsHazards(p=>p.length>1?p.filter(r=>r.id!==h.id):p)} style={{position:"absolute",top:10,right:12,background:"none",border:"none",color:"#9CA3AF",cursor:"pointer",fontSize:22}}>×</button>
             <div style={{fontSize:13,fontWeight:700,color:"#2563EB",marginBottom:8}}>Hazard {i+1}</div>
-            <div><label style={S.label}>Hazard description</label><input style={S.input} value={h.hazard} onChange={e=>setSwmsHazards(p=>p.map(r=>r.id===h.id?{...r,hazard:e.target.value}:r))} placeholder="Describe the hazard..." /></div>
+            <div><label style={S.label}>Hazard description</label><input style={S.input} value={h.hazard} onChange={e=>setSwmsHazards(p=>p.map(r=>r.id===h.id?{...r,hazard:e.target.value}:r))} placeholder="Describe the specific hazard..." /></div>
             <div style={{fontSize:13,fontWeight:600,color:"#6B7280",margin:"12px 0 6px"}}>Initial risk (before controls)</div>
             <RiskSelector label="Likelihood" options={LIKELIHOOD} value={h.initialL} onChange={v=>setSwmsHazards(p=>p.map(r=>r.id===h.id?{...r,initialL:v}:r))} />
             <div style={{marginTop:10}}><RiskSelector label="Consequence" options={CONSEQUENCE} value={h.initialC} onChange={v=>setSwmsHazards(p=>p.map(r=>r.id===h.id?{...r,initialC:v}:r))} /></div>
             <LiveRisk l={h.initialL} c={h.initialC} />
-            <div style={{marginTop:12}}><label style={S.label}>Control measures (Eliminate → Substitute → Isolate → Engineer → Admin → PPE)</label>
-              <textarea style={S.textarea} value={h.controls} onChange={e=>setSwmsHazards(p=>p.map(r=>r.id===h.id?{...r,controls:e.target.value}:r))} placeholder="List all control measures..." />
+            <div style={{marginTop:12}}>
+              <label style={S.label}>Control measures (Eliminate → Substitute → Isolate → Engineer → Admin → PPE)</label>
+              <textarea style={S.textarea} value={h.controls} onChange={e=>setSwmsHazards(p=>p.map(r=>r.id===h.id?{...r,controls:e.target.value}:r))} placeholder="List all control measures to be applied..." />
             </div>
-            <div style={{marginTop:10}}><label style={S.label}>Person responsible</label><input style={S.input} value={h.responsible} onChange={e=>setSwmsHazards(p=>p.map(r=>r.id===h.id?{...r,responsible:e.target.value}:r))} placeholder="Name / role" /></div>
+            <div style={{marginTop:10}}><label style={S.label}>Person responsible for implementation</label><input style={S.input} value={h.responsible} onChange={e=>setSwmsHazards(p=>p.map(r=>r.id===h.id?{...r,responsible:e.target.value}:r))} placeholder="Name / role" /></div>
             <div style={{fontSize:13,fontWeight:600,color:"#6B7280",margin:"12px 0 6px"}}>Residual risk (after controls)</div>
             <RiskSelector label="Likelihood" options={LIKELIHOOD} value={h.residualL} onChange={v=>setSwmsHazards(p=>p.map(r=>r.id===h.id?{...r,residualL:v}:r))} />
             <div style={{marginTop:10}}><RiskSelector label="Consequence" options={CONSEQUENCE} value={h.residualC} onChange={v=>setSwmsHazards(p=>p.map(r=>r.id===h.id?{...r,residualC:v}:r))} /></div>
@@ -930,29 +1015,35 @@ function Take5App({ company, onExit }) {
     </div>
   );
 
-  // COMPLETE
+  // ── COMPLETE
   if (screen==="complete") return (
     <div style={S.app}>
       {hdr}
-      <Pips active={5} />
+      <Pips active={6} />
       <div style={{textAlign:"center",padding:"8px 0 16px"}}>
         <div style={{width:60,height:60,background:"#D1FAE5",borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 12px",fontSize:30}}>✓</div>
         <div style={{fontSize:20,fontWeight:700}}>Safety check complete</div>
         <div style={{fontSize:13,color:"#6B7280",marginTop:4}}>{form.date} {form.time} · {company.company_name}</div>
       </div>
       <div style={{borderRadius:12,padding:"14px",background:"#F0FDF4",border:"2px solid #86EFAC",marginBottom:10}}>
-        <div style={{fontSize:16,fontWeight:700,color:"#15803D"}}>✓ Safe to proceed — Step 5</div>
+        <div style={{fontSize:16,fontWeight:700,color:"#15803D"}}>✓ Safe to proceed</div>
         <div style={{fontSize:14,color:"#166534",marginTop:4,lineHeight:1.5}}>
-          {result==="swms"?"SWMS completed and signed. All hazards documented.":"Take 5 complete. Standard controls apply."} If conditions change — stop and reassess.
+          {result==="swms"?"SWMS completed. All hazards documented with control measures.":"Take 5 complete. Standard controls apply."} If conditions change — stop and reassess.
         </div>
       </div>
       <div style={S.card}>
         <div style={{...S.divider,marginTop:0}}>Summary</div>
-        {[["Task",form.task],["Location",form.location],["Job ref",form.jobRef],
-          ["Hazards",selectedHazards.map(h=>h.label).join(", ")||"None"],
+        {[
+          ["Task",form.task],
+          ["Machine / equipment",form.machineEquipment],
+          ["Location",form.location],
+          ["Job ref",form.jobRef],
+          ["High risk tasks",selectedHrcw.map(t=>t.label).join(", ")||"None"],
+          ["Hazards identified",selectedHazards.map(h=>h.label).join(", ")||"None"],
           ["SWMS required",result==="swms"?"Yes":"No"],
           result==="swms"&&["Hazards documented",swmsHazards.length],
-          needsLift()&&["Lift analysis","Completed"],
+          needsLift&&["Lift analysis","Completed"],
+          needsCS&&["Confined space checklist","Completed"],
         ].filter(Boolean).map(([k,v])=>v?(
           <div key={k} style={{fontSize:14,padding:"5px 0",borderBottom:"1px solid #F3F4F6"}}><strong>{k}:</strong> {v}</div>
         ):null)}
@@ -969,12 +1060,14 @@ function Take5App({ company, onExit }) {
       <button style={{...S.btnPrim,background:"#374151",marginTop:8}} onClick={reset}>Start new Take 5</button>
     </div>
   );
+
   return null;
 }
 
-// ── PDF builder ───────────────────────────────────────────────────────────────
+// ── PDF ───────────────────────────────────────────────────────────────────────
 function buildPDF(rec, companyName) {
   const logoSvg = `<svg width="52" height="52" viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg"><path d="M8 3.5L36 3.5Q42 3.5 42 9.5L42 25Q42 39 22 43Q2 39 2 25L2 9.5Q2 3.5 8 3.5Z" fill="#2563EB"/><path d="M11 7L33 7Q38.5 7 38.5 12.5L38.5 24.5Q38.5 36 22 39.5Q5.5 36 5.5 24.5L5.5 12.5Q5.5 7 11 7Z" fill="#1D4ED8"/><path d="M13 22L19.5 29.5L31 15" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/><rect x="12" y="34" width="20" height="8" rx="3" fill="#F59E0B"/><text x="22" y="40.5" text-anchor="middle" style="fill:#fff;font-size:6px;font-weight:700;font-family:Arial">IQ</text></svg>`;
+  const hrcwList = HRCW_TASKS.filter(t=>rec.hrcwSelected?.[t.id]&&t.id!=="hrcw_none").map(t=>t.label).join(", ")||"None";
   return `<html><head><style>
     body{font-family:Arial,sans-serif;font-size:13px;color:#111;max-width:800px;margin:0 auto;padding:24px}
     h2{font-size:14px;margin:16px 0 6px;border-bottom:2px solid #2563EB;padding-bottom:4px;color:#1e3a5f}
@@ -995,16 +1088,23 @@ function buildPDF(rec, companyName) {
     </div>
   </div>
   <h2>Job details</h2>
-  <table><tr><th>Task</th><th>Location</th><th>Date</th><th>Time</th></tr>
-  <tr><td>${rec.task||"—"}</td><td>${rec.location||"—"}</td><td>${rec.date}</td><td>${rec.time}</td></tr></table>
+  <table>
+    <tr><th>Task</th><th>Machine / Equipment</th></tr>
+    <tr><td>${rec.task||"—"}</td><td>${rec.machineEquipment||"—"}</td></tr>
+    <tr><th>Location</th><th>Date / Time</th></tr>
+    <tr><td>${rec.location||"—"}</td><td>${rec.date} ${rec.time}</td></tr>
+  </table>
   <h2>Step 1 — Pre-task checklist</h2>
   <table><tr><th>Question</th><th>Answer</th></tr>
   ${STEP1_CHECKS.map(c=>`<tr><td>${c.text}</td><td style="font-weight:700;color:${rec.step1?.[c.id]==="yes"?"#B91C1C":"#065F46"}">${(rec.step1?.[c.id]||"—").toUpperCase()}</td></tr>`).join("")}</table>
-  <h2>Step 2 — Hazards identified</h2>
+  <h2>Step 2 — High risk construction work</h2>
+  <p><strong>Selected:</strong> ${hrcwList}</p>
+  ${HRCW_TASKS.filter(t=>rec.hrcwSelected?.[t.id]&&t.id!=="hrcw_none"&&t.permits.length>0).map(t=>`<p style="font-size:12px;color:#92400E"><strong>${t.label} permits required:</strong> ${t.permits.join(" | ")}</p>`).join("")}
+  <h2>Step 3 — Hazards identified</h2>
   <p>${(rec.hazards||[]).map(id=>HAZARDS.find(h=>h.id===id)?.label||id).join(", ")||"None"}</p>
-  <h2>Step 3 — Risk result</h2>
+  <h2>Risk result</h2>
   <p><span class="${rec.result==="swms"?"H":rec.result==="warning"?"M":"L"}">${rec.result==="swms"?"SWMS Required":rec.result==="warning"?"Warning — additional controls":"Safe to proceed"}</span></p>
-  ${rec.liftDetails?.load?`<h2>Lift analysis</h2><table><tr><th>Load</th><th>Weight</th><th>Crane/equipment</th><th>Radius</th></tr><tr><td>${rec.liftDetails.load}</td><td>${rec.liftDetails.weight}t</td><td>${rec.liftDetails.crane}</td><td>${rec.liftDetails.radius}m</td></tr></table>`:""}
+  ${rec.liftDetails?.load?`<h2>Lift analysis</h2><table><tr><th>Load</th><th>Weight</th><th>Equipment</th><th>Radius</th></tr><tr><td>${rec.liftDetails.load}</td><td>${rec.liftDetails.weight}t</td><td>${rec.liftDetails.crane}</td><td>${rec.liftDetails.radius}m</td></tr></table>`:""}
   ${rec.result==="swms"?`<h2>Step 4 — SWMS hazards & controls</h2>
   <table><tr><th>Hazard</th><th>Initial risk</th><th>Control measures</th><th>Responsible</th><th>Residual risk</th></tr>
   ${(rec.swmsHazards||[]).map(h=>{
@@ -1020,24 +1120,19 @@ function buildPDF(rec, companyName) {
 
 // ── ROOT ──────────────────────────────────────────────────────────────────────
 export default function App() {
-  const [mode, setMode] = useState("pin");       // "pin" | "adminLogin" | "app" | "admin"
-  const [company, setCompany] = useState(null);  // { company_id, company_name }
+  const [mode, setMode] = useState("pin");
+  const [company, setCompany] = useState(null);
   const [adminSession, setAdminSession] = useState(null);
 
   useEffect(()=>{
-    supabase.auth.getSession().then(({data})=>{
-      if (data.session) setAdminSession(data.session);
-    });
-    const { data:{ subscription } } = supabase.auth.onAuthStateChange((_e,s)=>{
-      setAdminSession(s);
-      if (s) setMode("admin");
-    });
+    supabase.auth.getSession().then(({data})=>{ if(data.session){ setAdminSession(data.session); setMode("admin"); } });
+    const { data:{subscription} } = supabase.auth.onAuthStateChange((_e,s)=>{ setAdminSession(s); if(s) setMode("admin"); else { setAdminSession(null); setMode("pin"); } });
     return ()=>subscription.unsubscribe();
   },[]);
 
   if (mode==="pin") return <PinLogin onSuccess={co=>{ setCompany(co); setMode("app"); }} onAdminClick={()=>setMode("adminLogin")} />;
   if (mode==="adminLogin") return <AdminLogin onSuccess={s=>{ setAdminSession(s); setMode("admin"); }} onBack={()=>setMode("pin")} />;
-  if (mode==="admin") return <AdminDashboard onBack={()=>setMode("pin")} onSettings={()=>setMode("settings")} onLogout={async()=>{ await supabase.auth.signOut(); setAdminSession(null); setMode("pin"); }} />;
+  if (mode==="admin") return <AdminDashboard onBack={()=>setMode("pin")} onSettings={()=>setMode("settings")} onLogout={async()=>{ await supabase.auth.signOut(); setMode("pin"); }} />;
   if (mode==="settings") return <SettingsPage onBack={()=>setMode("admin")} />;
   if (mode==="app"&&company) return <Take5App company={company} onExit={()=>setMode("pin")} />;
   return null;
