@@ -9,13 +9,15 @@ const MASTER_EMAIL = "fazl.michael@herrenknecht.com"; // Master admin email
 
 // ── Data constants ────────────────────────────────────────────────────────────
 const STEP1_CHECKS = [
-  { id:"s1_1", text:"Do I fully understand the task, the scope of work and the safe work procedure?", swmsTrigger:false },
-  { id:"s1_2", text:"Have I reviewed the relevant risk assessment, SWMS or work instructions for this task?", swmsTrigger:true },
-  { id:"s1_3", text:"Is the work area clear of unauthorised personnel and bystanders?", swmsTrigger:false },
-  { id:"s1_4", text:"Have I inspected my tools and equipment — are they in good condition and fit for purpose?", swmsTrigger:false },
-  { id:"s1_5", text:"Do I have the correct PPE in good condition for this specific task?", swmsTrigger:false },
-  { id:"s1_6", text:"Am I trained, competent, licensed and physically fit to perform this task today?", swmsTrigger:true },
-  { id:"s1_7", text:"Have conditions changed since the last shift or last time this task was performed?", swmsTrigger:false },
+  // goodAnswer = the answer that is "safe/green". swmsTrigger = answering the BAD way triggers SWMS
+  { id:"s1_1", text:"Do I fully understand the task, the scope of work and the safe work procedure?",       goodAnswer:"yes", swmsTrigger:false },
+  { id:"s1_2", text:"Have I reviewed the relevant risk assessment, SWMS or work instructions for this task?", goodAnswer:"yes", swmsTrigger:false },
+  { id:"s1_3", text:"Is the work area clear of unauthorised personnel and bystanders?",                     goodAnswer:"yes", swmsTrigger:false },
+  { id:"s1_4", text:"Have I inspected my tools and equipment — are they in good condition and fit for purpose?", goodAnswer:"yes", swmsTrigger:false },
+  { id:"s1_5", text:"Do I have the correct PPE in good condition for this specific task?",                  goodAnswer:"yes", swmsTrigger:false },
+  { id:"s1_6", text:"Am I trained, competent, licensed and physically fit to perform this task today?",     goodAnswer:"yes", swmsTrigger:false },
+  { id:"s1_7", text:"Have conditions changed since the last shift or last time this task was performed?",   goodAnswer:"no",  swmsTrigger:false },
+  { id:"s1_8", text:"Does this task involve lifting using a jib crane, chain block or come-along?",         goodAnswer:"no",  swmsTrigger:true  },
 ];
 
 const HRCW_TASKS = [
@@ -875,12 +877,16 @@ function Take5App({ company, onExit, onForgetDevice }) {
   const anyHrcw = Object.values(hrcw).some(v=>v);
 
   function calcResult() {
-    const noBasics = ["s1_5","s1_6"].some(id=>step1[id]==="no");
-    const s1swms = STEP1_CHECKS.filter(c=>c.swmsTrigger).some(c=>step1[c.id]==="yes");
+    // Bad answer = answering opposite of goodAnswer
+    const badAnswers = STEP1_CHECKS.filter(c => step1[c.id] && step1[c.id] !== c.goodAnswer);
+    const swmsTriggers = badAnswers.filter(c => c.swmsTrigger);
+    // Any bad answer on a swmsTrigger question = SWMS
+    // Also: PPE (s1_5), training (s1_6), conditions changed (s1_7) bad answers = SWMS
+    const criticalBad = badAnswers.some(c => ["s1_5","s1_6","s1_7","s1_8"].includes(c.id));
     const hrcwTriggered = selectedHrcw.length>0;
     const highHaz = HAZARDS.filter(h=>h.weight==="high").some(h=>hazards[h.id]);
     const medCount = HAZARDS.filter(h=>h.weight==="medium").filter(h=>hazards[h.id]).length;
-    if (noBasics||s1swms||hrcwTriggered||highHaz) return "swms";
+    if (criticalBad||swmsTriggers.length>0||hrcwTriggered||highHaz) return "swms";
     if (medCount>=1) return "warning";
     return "safe";
   }
@@ -975,15 +981,21 @@ function Take5App({ company, onExit, onForgetDevice }) {
                 {c.swmsTrigger&&<span style={{fontSize:10,color:"#DC2626",fontWeight:700,marginLeft:6,background:"#FEE2E2",padding:"2px 6px",borderRadius:4}}>SWMS</span>}
               </div>
               <div style={{display:"flex",gap:8}}>
-                {["yes","no"].map(v=>(
-                  <button key={v} onClick={()=>setStep1(p=>({...p,[c.id]:v}))}
-                    style={{flex:1,padding:"13px",borderRadius:10,border:"2px solid",fontSize:16,fontWeight:700,cursor:"pointer",
-                      background:ans===v?(v==="yes"?"#FEE2E2":"#D1FAE5"):"#F9FAFB",
-                      color:ans===v?(v==="yes"?"#B91C1C":"#065F46"):"#6B7280",
-                      borderColor:ans===v?(v==="yes"?"#FCA5A5":"#86EFAC"):"#E5E7EB"}}>
-                    {v==="yes"?"YES":"NO"}
-                  </button>
-                ))}
+                {["yes","no"].map(v=>{
+                  const isGood = v === c.goodAnswer;
+                  const isSelected = ans === v;
+                  let bg = "#F9FAFB", color = "#6B7280", border = "#E5E7EB";
+                  if (isSelected) {
+                    if (isGood) { bg="#D1FAE5"; color="#065F46"; border="#86EFAC"; }
+                    else        { bg="#FEE2E2"; color="#B91C1C"; border="#FCA5A5"; }
+                  }
+                  return (
+                    <button key={v} onClick={()=>setStep1(p=>({...p,[c.id]:v}))}
+                      style={{flex:1,padding:"13px",borderRadius:10,border:`2px solid ${border}`,fontSize:16,fontWeight:700,cursor:"pointer",background:bg,color:color}}>
+                      {v==="yes"?"YES":"NO"}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           );
