@@ -558,8 +558,9 @@ function MasterAdmin({ onLogout }) {
   }
 
   function exportAllPDF(recs, label) {
+    if (!recs || recs.length === 0) return;
     const w = window.open("","_blank","width=900,height=700");
-    w.document.write(buildBulkPDF(recs, label));
+    w.document.write(buildBulkPDF(recs, label||"Records"));
     w.document.close();
     setTimeout(()=>w.print(),800);
   }
@@ -664,7 +665,7 @@ function MasterAdmin({ onLogout }) {
       {/* ── RECORDS TAB ── */}
       {!loading && tab==="records" && (
         <RecordsView records={allRecords} companyName="All Companies" showCompany={true}
-          onExportAll={()=>exportAllPDF(allRecords,"All Companies")}
+          onExportAll={(recs,label)=>exportAllPDF(recs, label||"All Companies")}
           onExportSingle={r=>exportAllPDF([r],"Single Record")} />
       )}
     </div>
@@ -758,7 +759,7 @@ function CompanyAdmin({ session, onLogout }) {
 
       {tab==="records" && (
         <RecordsView records={records} companyName={company.name} showCompany={false}
-          onExportAll={exportAllPDF}
+          onExportAll={(recs,label)=>{ const w=window.open("","_blank","width=900,height=700"); w.document.write(buildBulkPDF(recs,label||company?.name)); w.document.close(); setTimeout(()=>w.print(),800); }}
           onExportSingle={exportSinglePDF} />
       )}
 
@@ -800,6 +801,7 @@ function CompanyAdmin({ session, onLogout }) {
 function RecordsView({ records, companyName, showCompany, onExportAll, onExportSingle }) {
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState({});
 
   const filtered = records.filter(r=>{
     if (filter!=="all"&&r.result!==filter) return false;
@@ -811,23 +813,62 @@ function RecordsView({ records, companyName, showCompany, onExportAll, onExportS
     return true;
   });
 
+  const selectedIds = Object.keys(selected).filter(id=>selected[id]);
+  const selectedRecords = filtered.filter(r=>selected[r.id]);
+  const allFilteredSelected = filtered.length>0 && filtered.every(r=>selected[r.id]);
+
+  function toggleAll() {
+    if (allFilteredSelected) setSelected({});
+    else { const s={}; filtered.forEach(r=>s[r.id]=true); setSelected(s); }
+  }
+
+  function Checkbox({ checked }) {
+    return (
+      <div style={{ width:20, height:20, border:"2px solid", borderColor:checked?"#2563EB":"#D1D5DB", borderRadius:4, background:checked?"#2563EB":"#fff", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+        {checked && <span style={{ color:"#fff", fontSize:12, fontWeight:800, lineHeight:1 }}>✓</span>}
+      </div>
+    );
+  }
+
   return (
     <div>
-      <div style={{ display:"flex", gap:8, marginBottom:10 }}>
-        <input style={{ ...S.input, flex:1 }} placeholder="Search task, location, ref..." value={search} onChange={e=>setSearch(e.target.value)} />
-      </div>
+      <input style={{ ...S.input, marginBottom:10 }} placeholder="Search task, location, ref..." value={search} onChange={e=>setSearch(e.target.value)} />
       <div style={{ display:"flex", gap:6, marginBottom:10, flexWrap:"wrap" }}>
         {["all","safe","warning","swms"].map(f=>(
           <button key={f} onClick={()=>setFilter(f)} style={{ padding:"8px 12px", border:"1px solid #E5E7EB", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer", background:filter===f?"#2563EB":"#F9FAFB", color:filter===f?"#fff":"#374151" }}>{f==="all"?"All":f.toUpperCase()}</button>
         ))}
-        {records.length>0 && <button onClick={onExportAll} style={{ ...S.btnSec, padding:"8px 12px", fontSize:13, marginLeft:"auto" }}>📄 Export all PDF</button>}
+      </div>
+      {/* Bulk action bar */}
+      <div style={{ display:"flex", gap:8, marginBottom:12, alignItems:"center", flexWrap:"wrap" }}>
+        <button onClick={toggleAll} style={{ ...S.btnSec, padding:"7px 12px", fontSize:13, display:"flex", alignItems:"center", gap:8 }}>
+          <Checkbox checked={allFilteredSelected} />
+          {allFilteredSelected ? "Deselect all" : "Select all"}
+        </button>
+        {selectedIds.length > 0 ? (
+          <>
+            <button onClick={()=>onExportAll(selectedRecords, `${selectedIds.length} selected records`)}
+              style={{ ...S.btnPrim, width:"auto", marginTop:0, padding:"7px 16px", fontSize:13 }}>
+              📄 Export {selectedIds.length} selected
+            </button>
+            <button onClick={()=>setSelected({})} style={{ ...S.btnSec, padding:"7px 10px", fontSize:12, color:"#9CA3AF" }}>Clear</button>
+          </>
+        ) : records.length > 0 && (
+          <button onClick={()=>onExportAll(records, companyName||"All records")}
+            style={{ ...S.btnSec, padding:"7px 12px", fontSize:13 }}>
+            📄 Export all ({records.length})
+          </button>
+        )}
       </div>
       {filtered.length===0 && <div style={{ textAlign:"center", padding:40, color:"#9CA3AF", fontSize:14 }}>No records found.</div>}
       {filtered.map(r=>{
         const rd = r.record_data||{};
+        const isSelected = !!selected[r.id];
         return (
-          <div key={r.id} style={{ ...S.card, marginBottom:8 }}>
-            <div style={{ display:"flex", alignItems:"flex-start", gap:8 }}>
+          <div key={r.id}
+            style={{ ...S.card, marginBottom:8, border:isSelected?"2px solid #2563EB":"1px solid #E5E7EB", cursor:"pointer" }}
+            onClick={()=>setSelected(p=>({...p,[r.id]:!p[r.id]}))}>
+            <div style={{ display:"flex", alignItems:"flex-start", gap:10 }}>
+              <div style={{ paddingTop:2 }}><Checkbox checked={isSelected} /></div>
               <div style={{ flex:1, minWidth:0 }}>
                 <div style={{ fontSize:15, fontWeight:600 }}>{r.task||rd.task||r.job_ref||"Untitled task"}</div>
                 <div style={{ fontSize:13, color:"#6B7280", marginTop:2 }}>{r.location||rd.location||"No location"}{showCompany&&r.company_id?" · "+companies_cache[r.company_id]:""}</div>
@@ -840,7 +881,8 @@ function RecordsView({ records, companyName, showCompany, onExportAll, onExportS
               </div>
               <div style={{ display:"flex", flexDirection:"column", gap:6, alignItems:"flex-end", flexShrink:0 }}>
                 <ResultBadge result={r.result} />
-                <button style={{ ...S.btnSec, padding:"5px 10px", fontSize:12 }} onClick={()=>onExportSingle(r)}>📄 PDF</button>
+                <button style={{ ...S.btnSec, padding:"5px 10px", fontSize:12 }}
+                  onClick={e=>{e.stopPropagation(); onExportSingle(r);}}>📄 PDF</button>
               </div>
             </div>
           </div>
@@ -1215,6 +1257,13 @@ function Take5App({ company, onExit, onForgetDevice }) {
     </div>
   );
 
+  // Auto-save when complete screen is shown
+  useEffect(() => {
+    if (screen === "complete" && !savedId && !saving) {
+      saveToCloud();
+    }
+  }, [screen]);
+
   if (screen==="complete") return (
     <div style={S.app}>
       {hdr}<Pips active={6} />
@@ -1241,12 +1290,12 @@ function Take5App({ company, onExit, onForgetDevice }) {
         ].filter(Boolean).map(([k,v])=>v?<div key={k} style={{fontSize:14,padding:"5px 0",borderBottom:"1px solid #F3F4F6"}}><strong>{k}:</strong> {v}</div>:null)}
       </div>
       <div style={S.card}>
-        <div style={{...S.divider,marginTop:0}}>Save & export</div>
-        {cloudMsg&&<div style={{fontSize:14,marginBottom:10,padding:"8px 12px",borderRadius:8,background:cloudMsg.includes("✓")?"#D1FAE5":"#FEE2E2",color:cloudMsg.includes("✓")?"#065F46":"#B91C1C"}}>{cloudMsg}</div>}
-        <button style={{...S.btnPrim,background:savedId?"#16A34A":"#2563EB",opacity:saving?.6:1}} onClick={saveToCloud} disabled={saving||!!savedId}>
-          {saving?"Saving...":savedId?"✓ Saved to cloud":"☁ Save to cloud"}
-        </button>
-        <button style={{...S.btnSec,width:"100%",textAlign:"center",marginTop:8}} onClick={exportPDF}>📄 Export PDF</button>
+        <div style={{...S.divider,marginTop:0}}>Record saved</div>
+        <div style={{fontSize:14,padding:"10px 12px",borderRadius:8,
+          background:savedId?"#D1FAE5":saving?"#EFF6FF":"#FEE2E2",
+          color:savedId?"#065F46":saving?"#1D4ED8":"#B91C1C"}}>
+          {saving?"☁ Saving to cloud...":savedId?"✓ Saved to cloud successfully":"⚠ Save failed — "+cloudMsg}
+        </div>
       </div>
       <button style={{...S.btnSec,width:"100%",textAlign:"center",marginTop:4}} onClick={()=>setScreen("records")}>View records</button>
       <button style={{...S.btnPrim,background:"#374151",marginTop:8}} onClick={reset}>Start new Take 5</button>
