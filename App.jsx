@@ -912,6 +912,13 @@ function Take5App({ company, onExit, onForgetDevice }) {
   const [savedId, setSavedId] = useState(null);
   const [cloudMsg, setCloudMsg] = useState("");
 
+  // Auto-save when worker reaches complete screen
+  useEffect(() => {
+    if (screen === "complete" && !savedId && !saving) {
+      saveToCloud();
+    }
+  }, [screen]);
+
   const setF = k => e => setForm(f=>({...f,[k]:e.target.value}));
   const selectedHrcw = HRCW_TASKS.filter(t=>hrcw[t.id]&&t.id!=="hrcw_none");
   const needsLift = selectedHrcw.some(t=>t.triggerLift);
@@ -1256,13 +1263,6 @@ function Take5App({ company, onExit, onForgetDevice }) {
       <button style={{...S.btnSec,width:"100%",textAlign:"center",marginTop:8}} onClick={()=>setScreen("step3")}>← Back</button>
     </div>
   );
-
-  // Auto-save when complete screen is shown
-  useEffect(() => {
-    if (screen === "complete" && !savedId && !saving) {
-      saveToCloud();
-    }
-  }, [screen]);
 
   if (screen==="complete") return (
     <div style={S.app}>
