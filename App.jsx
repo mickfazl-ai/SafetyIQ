@@ -11,7 +11,6 @@ const MASTER_EMAIL = "fazl.michael@herrenknecht.com"; // Master admin email
 const STEP1_CHECKS = [
   // goodAnswer = the answer that is "safe/green". swmsTrigger = answering the BAD way triggers SWMS
   { id:"s1_1", text:"Do I fully understand the task, the scope of work and the safe work procedure?",       goodAnswer:"yes", swmsTrigger:false },
-  { id:"s1_2", text:"Have I reviewed the relevant risk assessment, SWMS or work instructions for this task?", goodAnswer:"yes", swmsTrigger:false },
   { id:"s1_3", text:"Is the work area clear of unauthorised personnel and bystanders?",                     goodAnswer:"yes", swmsTrigger:false },
   { id:"s1_4", text:"Have I inspected my tools and equipment — are they in good condition and fit for purpose?", goodAnswer:"yes", swmsTrigger:false },
   { id:"s1_5", text:"Do I have the correct PPE in good condition for this specific task?",                  goodAnswer:"yes", swmsTrigger:false },
@@ -30,6 +29,8 @@ const HRCW_TASKS = [
   { id:"hrcw_chem",   label:"Hazardous Substances",     sub:"Hydraulic oils, greases, epoxy, solvents, cleaning agents", icon:"🧪", permits:["SDS must be available on site","Adequate ventilation and spill containment required"], triggerLift:false, triggerCS:false },
   { id:"hrcw_plant",  label:"Working Near Mobile Plant", sub:"Cranes, forklifts, excavators, vehicles in work area", icon:"🚛", permits:["Exclusion zones must be established","Spotter/traffic controller required where visibility limited"], triggerLift:false, triggerCS:false },
   { id:"hrcw_excav",  label:"Excavation / Ground Disturbance", sub:"Digging, trenching, underground services", icon:"⛏", permits:["Dial Before You Dig — 1100","BYDA check required"], triggerLift:false, triggerCS:false },
+  { id:"hrcw_hotwork",label:"Hot Works",                 sub:"Welding, cutting, grinding, brazing or any open flame work", icon:"🔥", permits:["Hot Work Permit required before commencing","Fire extinguisher must be on hand and serviceable","Fire watch required for 30 minutes after completion"], triggerLift:false, triggerCS:false },
+  { id:"hrcw_elec",   label:"Electrical Works",          sub:"Live electrical work, switchboards, isolation, electrical testing", icon:"⚡", permits:["Electrical Isolation Permit required","Only a licensed electrician to perform live electrical work","Test for dead before touching any conductors"], triggerLift:false, triggerCS:false },
   { id:"hrcw_none",   label:"No High Risk Tasks",       sub:"This task does not involve any high risk construction work", icon:"✓", permits:[], triggerLift:false, triggerCS:false },
 ];
 
@@ -47,6 +48,24 @@ const HAZARDS = [
   { id:"h_ergon", label:"Ergonomic / Fatigue",     sub:"Repetitive work, awkward access, shift fatigue",        weight:"medium" },
   { id:"h_other", label:"Other Hazard",            sub:"Any hazard not captured above",                         weight:"medium" },
 ];
+
+// Pre-populated hazard descriptions for SWMS auto-fill
+const HAZARD_SUGGESTIONS = {
+  h_mh:    { hazard:"Manual Handling — heavy lifts, awkward postures, repetitive strain, over-exertion", initialL:"2", initialC:"2" },
+  h_fall:  { hazard:"Falls / Slips / Trips — wet surfaces, uneven ground, open edges, debris on walkways", initialL:"2", initialC:"3" },
+  h_mech:  { hazard:"Mechanical Hazards — rotating parts, nip points, struck by moving components or tools", initialL:"2", initialC:"3" },
+  h_press: { hazard:"Pressure / Stored Energy — hydraulic/pneumatic energy release, springs under load, accumulators", initialL:"1", initialC:"3" },
+  h_chem:  { hazard:"Chemical / Substance — skin/eye contact with hydraulic oil, grease, solvents or cleaning agents", initialL:"2", initialC:"1" },
+  h_noise: { hazard:"Noise / Vibration — exposure to impact tools, grinders, heavy machinery above safe levels", initialL:"3", initialC:"1" },
+  h_heat:  { hazard:"Heat / Burns — contact with hot surfaces, steam, friction heat or welding operations", initialL:"2", initialC:"2" },
+  h_struct:{ hazard:"Structural Instability — unsecured machine frames, overhead components, inadequate support during disassembly", initialL:"1", initialC:"3" },
+  h_env:   { hazard:"Environment / Weather — rain, wind, heat stress, poor lighting, dust affecting work conditions", initialL:"2", initialC:"1" },
+  h_traffic:{ hazard:"Traffic / Mobile Plant — vehicles, forklifts or cranes operating near the work area", initialL:"2", initialC:"3" },
+  h_ergon: { hazard:"Ergonomic / Fatigue — repetitive tasks, awkward access positions, end-of-shift fatigue", initialL:"3", initialC:"1" },
+  h_other: { hazard:"Other Hazard — ", initialL:"", initialC:"" },
+};
+
+
 
 const LIKELIHOOD = [
   { value:0, label:"Rare",           short:"Rare (1)",           desc:"May occur only in exceptional circumstances", color:"#065F46", bg:"#D1FAE5" },
@@ -896,6 +915,115 @@ function RecordsView({ records, companyName, showCompany, onExportAll, onExportS
 const companies_cache = {};
 
 // ── TAKE 5 APP (worker flow) ──────────────────────────────────────────────────
+
+// Suggested control measures per hazard type
+const SUGGESTED_CONTROLS = {
+  h_mh: [
+    "Use mechanical lifting aids (hoist, forklift, crane) for loads >20kg",
+    "Team lift — minimum 2 persons for heavy/awkward loads",
+    "Plan lift route before moving — clear path of obstructions",
+    "Use correct lifting technique — bend knees, straight back",
+    "Take breaks to reduce fatigue during repetitive tasks",
+  ],
+  h_fall: [
+    "Install physical barriers / guardrails at all open edges",
+    "Wear appropriate footwear with slip-resistant soles",
+    "Keep work area clear of debris, hoses and tools",
+    "Use three points of contact when climbing ladders",
+    "Inspect work area for slip/trip hazards before starting",
+    "Use non-slip matting on wet surfaces",
+  ],
+  h_mech: [
+    "Ensure all guards are in place before operating machinery",
+    "Isolate and de-energise plant before any maintenance (LOTO)",
+    "Maintain safe distance from rotating/moving parts",
+    "Use correct PPE — safety glasses, gloves, steel-cap boots",
+    "Never reach into machinery while in motion",
+  ],
+  h_press: [
+    "Depressurise system fully before disconnecting any lines",
+    "Verify zero pressure using gauge before work commences",
+    "Use correct rated fittings and hoses for the pressure involved",
+    "Wear face shield and heavy gloves when working near pressurised lines",
+    "Stand to the side — never in line with potential discharge path",
+    "Check for trapped pressure in accumulators before work",
+  ],
+  h_chem: [
+    "Read and follow the Safety Data Sheet (SDS) before use",
+    "Wear appropriate PPE — gloves, eye protection, apron",
+    "Ensure adequate ventilation in the work area",
+    "Use spill containment trays under equipment",
+    "Have spill kit accessible on site",
+    "Avoid skin contact — wash immediately if contact occurs",
+  ],
+  h_noise: [
+    "Wear hearing protection (earmuffs/earplugs) when using noisy tools",
+    "Limit exposure time to high-noise tasks where possible",
+    "Use quieter alternative tools or methods if available",
+    "Maintain tools to reduce excessive vibration/noise",
+  ],
+  h_heat: [
+    "Allow hot surfaces to cool before handling",
+    "Use insulated gloves when handling hot components",
+    "Wear long sleeves and appropriate PPE for welding/cutting",
+    "Keep flammable materials clear of heat sources",
+    "Fire extinguisher to be on hand during hot work",
+  ],
+  h_struct: [
+    "Use engineered lifting and support points only",
+    "Install temporary supports/props before removing structural components",
+    "Never work under unsupported loads or structures",
+    "Obtain engineering sign-off before modifying structural elements",
+    "Establish exclusion zone under overhead work",
+  ],
+  h_env: [
+    "Monitor weather forecast — cease outdoor work in dangerous conditions",
+    "Ensure adequate lighting in the work area",
+    "Provide sun protection (shade, sunscreen, hat) for outdoor work",
+    "Take regular hydration breaks in heat",
+    "Secure loose items if working in wind",
+  ],
+  h_traffic: [
+    "Establish and sign exclusion zone around work area",
+    "Use spotter/traffic controller when visibility is limited",
+    "Wear high-visibility PPE at all times",
+    "Communicate with plant operators before commencing work",
+    "Park vehicles clear of work area",
+  ],
+  h_ergon: [
+    "Rotate tasks to avoid prolonged repetitive movements",
+    "Use ergonomic tools and equipment where available",
+    "Take regular breaks during physically demanding tasks",
+    "Adjust work height to reduce bending/stretching",
+    "Report fatigue to supervisor — do not work impaired",
+  ],
+};
+
+function SuggestedControls({ hazardId, onAdd }) {
+  const [open, setOpen] = useState(false);
+  const controls = SUGGESTED_CONTROLS[hazardId];
+  if (!controls || controls.length === 0) return null;
+  return (
+    <div style={{ marginTop:6 }}>
+      <button type="button" onClick={()=>setOpen(o=>!o)}
+        style={{ background:"none", border:"none", color:"#2563EB", fontSize:12, fontWeight:600, cursor:"pointer", padding:"4px 0", display:"flex", alignItems:"center", gap:4 }}>
+        💡 {open?"Hide":"Show"} suggested controls ({controls.length})
+      </button>
+      {open && (
+        <div style={{ background:"#F0F7FF", border:"1px solid #BFDBFE", borderRadius:8, padding:"8px 10px", marginTop:4 }}>
+          <div style={{ fontSize:11, color:"#6B7280", marginBottom:6, fontWeight:600 }}>Tap to add to control measures:</div>
+          {controls.map((c,i) => (
+            <button key={i} type="button" onClick={()=>onAdd(c)}
+              style={{ display:"block", width:"100%", textAlign:"left", background:"#fff", border:"1px solid #BFDBFE", borderRadius:6, padding:"6px 10px", marginBottom:4, fontSize:13, color:"#1e3a5f", cursor:"pointer", lineHeight:1.4 }}>
+              + {c}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Take5App({ company, onExit, onForgetDevice }) {
   const [screen, setScreen] = useState("setup");
   const [form, setForm] = useState({ jobRef:"", location:"", date:new Date().toISOString().slice(0,10), time:new Date().toTimeString().slice(0,5), task:"", machine:"" });
@@ -1200,7 +1328,29 @@ function Take5App({ company, onExit, onForgetDevice }) {
           {result==="safe"?"✓ Proceed safely":result==="warning"?"⚠ Additional controls required":"✕ SWMS required — do not proceed"}
         </div>
       </div>
-      {result==="swms"?<button style={S.btnPrim} onClick={()=>setScreen("swms")}>Complete SWMS →</button>
+      {result==="swms"
+        ?<button style={S.btnPrim} onClick={()=>{
+            // Auto-populate SWMS rows from selected hazards
+            const haz = Object.keys(hazards).filter(k=>hazards[k]);
+            if (haz.length > 0) {
+              const rows = haz.map((id,i) => {
+                const sug = HAZARD_SUGGESTIONS[id];
+                return {
+                  id: Date.now()+i,
+                  sourceHazardId: id,
+                  hazard: sug ? sug.hazard : "",
+                  initialL: sug ? sug.initialL : "",
+                  initialC: sug ? sug.initialC : "",
+                  controls: "",
+                  responsible: "",
+                  residualL: "",
+                  residualC: ""
+                };
+              });
+              setSwmsRows(rows);
+            }
+            setScreen("swms");
+          }}>Complete SWMS →</button>
         :<button style={S.btnPrim} onClick={()=>setScreen("complete")}>Sign off →</button>}
       <button style={{...S.btnSec,width:"100%",textAlign:"center",marginTop:8}} onClick={()=>setScreen(needsCS?"confined":needsLift?"lift":"step2")}>← Back</button>
     </div>
@@ -1235,13 +1385,19 @@ function Take5App({ company, onExit, onForgetDevice }) {
           <div key={h.id} style={{...S.card,position:"relative",border:"2px solid #E5E7EB"}}>
             <button onClick={()=>setSwmsRows(p=>p.length>1?p.filter(r=>r.id!==h.id):p)} style={{position:"absolute",top:10,right:12,background:"none",border:"none",color:"#9CA3AF",cursor:"pointer",fontSize:22}}>×</button>
             <div style={{fontSize:13,fontWeight:700,color:"#2563EB",marginBottom:8}}>Hazard {i+1}</div>
-            <div><label style={S.label}>Hazard description</label><input style={S.input} value={h.hazard} onChange={e=>setSwmsRows(p=>p.map(r=>r.id===h.id?{...r,hazard:e.target.value}:r))} placeholder="Describe the hazard..." /></div>
+            <div>
+              <label style={S.label}>Hazard description</label>
+              <textarea style={{...S.textarea, minHeight:54}} value={h.hazard} onChange={e=>setSwmsRows(p=>p.map(r=>r.id===h.id?{...r,hazard:e.target.value}:r))} placeholder="Describe the hazard..." />
+            </div>
             <div style={{fontSize:13,fontWeight:600,color:"#6B7280",margin:"12px 0 6px"}}>Initial risk (before controls)</div>
             <RiskSelector label="Likelihood" options={LIKELIHOOD} value={h.initialL} onChange={v=>setSwmsRows(p=>p.map(r=>r.id===h.id?{...r,initialL:v}:r))} />
             <div style={{marginTop:10}}><RiskSelector label="Consequence" options={CONSEQUENCE} value={h.initialC} onChange={v=>setSwmsRows(p=>p.map(r=>r.id===h.id?{...r,initialC:v}:r))} /></div>
             <LiveRisk l={h.initialL} c={h.initialC} />
-            <div style={{marginTop:12}}><label style={S.label}>Control measures (Eliminate → Substitute → Isolate → Engineer → Admin → PPE)</label>
-              <textarea style={S.textarea} value={h.controls} onChange={e=>setSwmsRows(p=>p.map(r=>r.id===h.id?{...r,controls:e.target.value}:r))} placeholder="List all control measures..." /></div>
+            <div style={{marginTop:12}}>
+              <label style={S.label}>Control measures (Eliminate → Substitute → Isolate → Engineer → Admin → PPE)</label>
+              <textarea style={S.textarea} value={h.controls} onChange={e=>setSwmsRows(p=>p.map(r=>r.id===h.id?{...r,controls:e.target.value}:r))} placeholder="List all control measures to be applied..." />
+              <SuggestedControls hazardId={h.sourceHazardId} onAdd={text=>setSwmsRows(p=>p.map(r=>r.id===h.id?{...r,controls:r.controls?(r.controls+"\n"+text):text}:r))} />
+            </div>
             <div style={{marginTop:10}}><label style={S.label}>Person responsible</label><input style={S.input} value={h.responsible} onChange={e=>setSwmsRows(p=>p.map(r=>r.id===h.id?{...r,responsible:e.target.value}:r))} placeholder="Name / role" /></div>
             <div style={{fontSize:13,fontWeight:600,color:"#6B7280",margin:"12px 0 6px"}}>Residual risk (after controls)</div>
             <RiskSelector label="Likelihood" options={LIKELIHOOD} value={h.residualL} onChange={v=>setSwmsRows(p=>p.map(r=>r.id===h.id?{...r,residualL:v}:r))} />
