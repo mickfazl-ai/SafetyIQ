@@ -1487,15 +1487,16 @@ function buildBulkPDF(records, companyName) {
 
   const pages = records.map((r, idx) => {
     const rd = r.record_data||{};
-    const hrcwList = (rd.hazards||[]).map(id=>HAZARDS.find(h=>h.id===id)?.label||id).join(", ")||"None";
     const hazardList = (rd.hazards||[]).map(id=>HAZARDS.find(h=>h.id===id)?.label||id).join(", ")||"None";
+    const dateStr = r.created_at?.slice(0,10)||"";
+    const timeStr = r.created_at?.slice(11,16)||"";
 
     return `<div class="${idx<records.length-1?'page-break':''}">
       <div class="header">
         ${logoSvg}
         <div>
-          <div style="font-size:22px;font-weight:800">Safety<span style="color:#2563EB">IQ</span> ${r.result==="swms"?"— SWMS":""}</div>
-          <div style="color:#6B7280;font-size:12px">${companyName||""} | ${r.created_at?.slice(0,10)||""} ${r.created_at?.slice(11,16)||""} | Ref: ${r.job_ref||rd.jobRef||"—"}</div>
+          <div style="font-size:22px;font-weight:800">Take 5 &mdash; ${companyName||""}</div>
+          <div style="color:#6B7280;font-size:12px">${dateStr} ${timeStr} | Ref: ${r.job_ref||rd.jobRef||"—"}</div>
         </div>
         <div style="margin-left:auto;text-align:right">
           <span class="badge ${r.result==="swms"?"badge-H":r.result==="warning"?"badge-M":"badge-L"}">${r.result==="swms"?"SWMS Required":r.result==="warning"?"Warning":"Safe"}</span>
@@ -1505,26 +1506,39 @@ function buildBulkPDF(records, companyName) {
       <table><tr><th>Task</th><th>Machine / Equipment</th></tr>
       <tr><td>${r.task||rd.task||"—"}</td><td>${rd.machine||"—"}</td></tr>
       <tr><th>Location</th><th>Date / Time</th></tr>
-      <tr><td>${r.location||rd.location||"—"}</td><td>${r.created_at?.slice(0,10)||""} ${r.created_at?.slice(11,16)||""}</td></tr></table>
+      <tr><td>${r.location||rd.location||"—"}</td><td>${dateStr} ${timeStr}</td></tr></table>
       <h2>Step 1 — Pre-task checklist</h2>
       <table><tr><th>Question</th><th>Answer</th></tr>
-      ${STEP1_CHECKS.map(c=>`<tr><td>${c.text}</td><td style="font-weight:700;color:${rd.step1?.[c.id]==="yes"?"#B91C1C":"#065F46"}">${(rd.step1?.[c.id]||"—").toUpperCase()}</td></tr>`).join("")}</table>
-      <h2>Step 2 — High risk tasks selected</h2>
-      <p>${hrcwList}</p>
-
-      <h2>Step 3 — Hazards identified</h2>
+      ${STEP1_CHECKS.map(c=>{
+        const ans = rd.step1?.[c.id]||"—";
+        const isGood = ans === c.goodAnswer;
+        const color = ans==="—" ? "#111" : isGood ? "#065F46" : "#B91C1C";
+        return `<tr><td>${c.text}</td><td style="font-weight:700;color:${color}">${ans.toUpperCase()}</td></tr>`;
+      }).join("")}</table>
+      <h2>Step 2 — Hazards identified</h2>
       <p>${hazardList}</p>
-      ${rd.liftDetails?.load?`<h2>Lift analysis</h2><table><tr><th>Load</th><th>Weight</th><th>Equipment</th><th>Radius</th></tr><tr><td>${rd.liftDetails.load}</td><td>${rd.liftDetails.weight}t</td><td>${rd.liftDetails.crane}</td><td>${rd.liftDetails.radius}m</td></tr></table>`:""}
-      ${r.result==="swms"&&(rd.swmsHazards||[]).length>0?`<h2>Step 4 — SWMS</h2>
+      ${r.result==="swms"&&(rd.swmsHazards||[]).length>0?`<h2>Step 3 — SWMS</h2>
       <table><tr><th>Hazard</th><th>Initial risk</th><th>Control measures</th><th>Responsible</th><th>Residual risk</th></tr>
       ${(rd.swmsHazards||[]).map(h=>{
         const ir=h.initialL!==""&&h.initialC!==""?matrixRating(parseInt(h.initialL),parseInt(h.initialC)):null;
         const rr=h.residualL!==""&&h.residualC!==""?matrixRating(parseInt(h.residualL),parseInt(h.residualC)):null;
         return`<tr><td>${h.hazard||"—"}</td><td>${ir?`<span class="badge badge-${ir.label[0]}">${ir.label}</span>`:"—"}</td><td>${h.controls||"—"}</td><td>${h.responsible||"—"}</td><td>${rr?`<span class="badge badge-${rr.label[0]}">${rr.label}</span>`:"—"}</td></tr>`;
       }).join("")}</table>`:""}
-      <h2>Step 5 — Sign-off</h2>
-      <table><tr><th width="50%">Worker: ${rd.sigWorker||"—"}</th><th width="50%">Supervisor: ${rd.sigSupervisor||"—"}</th></tr>
-      <tr><td><div class="sig"></div></td><td><div class="sig"></div></td></tr></table>
+      <h2>Step 4 — Sign-off</h2>
+      <table>
+        <tr><th width="50%">Worker</th><th width="50%">Supervisor</th></tr>
+        <tr>
+          <td style="padding:10px;vertical-align:top">
+            <div style="font-size:14px;font-weight:700;color:#1F2937">${rd.sigWorker||"—"}</div>
+            <div style="font-size:11px;color:#6B7280;margin-top:4px">Completed: ${dateStr} ${timeStr}</div>
+            <div style="font-size:11px;color:#065F46;margin-top:4px">✓ Digitally confirmed by submitting this Take 5</div>
+          </td>
+          <td style="padding:10px;vertical-align:top">
+            <div style="font-size:14px;font-weight:700;color:#1F2937">${rd.sigSupervisor||"—"}</div>
+            <div class="sig" style="margin-top:8px"></div>
+          </td>
+        </tr>
+      </table>
     </div>`;
   });
 
