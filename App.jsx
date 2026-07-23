@@ -1104,29 +1104,20 @@ function Take5App({ company, onExit, onForgetDevice }) {
   }, [screen]);
 
   const setF = k => e => setForm(f=>({...f,[k]:e.target.value}));
-  const selectedHrcw = HRCW_TASKS.filter(t=>hrcw[t.id]&&t.id!=="hrcw_none");
-  const needsLift = selectedHrcw.some(t=>t.triggerLift);
-  const needsCS = selectedHrcw.some(t=>t.triggerCS);
-  const anyHrcw = Object.values(hrcw).some(v=>v);
+  const needsCS = !!hazards['h_cs'];
 
   function calcResult() {
-    // Bad answer = answering opposite of goodAnswer
     const badAnswers = STEP1_CHECKS.filter(c => step1[c.id] && step1[c.id] !== c.goodAnswer);
     const swmsTriggers = badAnswers.filter(c => c.swmsTrigger);
-    // Any bad answer on a swmsTrigger question = SWMS
-    // Also: PPE (s1_5), training (s1_6), conditions changed (s1_7) bad answers = SWMS
     const criticalBad = badAnswers.some(c => ["s1_5","s1_6","s1_7","s1_8"].includes(c.id));
-    const hrcwTriggered = selectedHrcw.length>0;
     const highHaz = HAZARDS.filter(h=>h.weight==="high").some(h=>hazards[h.id]);
     const medCount = HAZARDS.filter(h=>h.weight==="medium").filter(h=>hazards[h.id]).length;
-    if (criticalBad||swmsTriggers.length>0||hrcwTriggered||highHaz) return "swms";
+    if (criticalBad||swmsTriggers.length>0||highHaz) return "swms";
     if (medCount>=1) return "warning";
     return "safe";
   }
 
   function step1Done() { return STEP1_CHECKS.every(c=>step1[c.id]!==undefined); }
-  function getNextAfterHrcw() { return needsLift?"lift":needsCS?"confined":"step3"; }
-  function getNextAfterLift() { return needsCS?"confined":"step3"; }
 
   async function saveToCloud() {
     setSaving(true); setCloudMsg("");
@@ -1496,7 +1487,7 @@ function buildBulkPDF(records, companyName) {
 
   const pages = records.map((r, idx) => {
     const rd = r.record_data||{};
-    const hrcwList = HRCW_TASKS.filter(t=>rd.hrcwSelected?.[t.id]&&t.id!=="hrcw_none").map(t=>t.label).join(", ")||"None";
+    const hrcwList = (rd.hazards||[]).map(id=>HAZARDS.find(h=>h.id===id)?.label||id).join(", ")||"None";
     const hazardList = (rd.hazards||[]).map(id=>HAZARDS.find(h=>h.id===id)?.label||id).join(", ")||"None";
 
     return `<div class="${idx<records.length-1?'page-break':''}">
@@ -1520,7 +1511,7 @@ function buildBulkPDF(records, companyName) {
       ${STEP1_CHECKS.map(c=>`<tr><td>${c.text}</td><td style="font-weight:700;color:${rd.step1?.[c.id]==="yes"?"#B91C1C":"#065F46"}">${(rd.step1?.[c.id]||"—").toUpperCase()}</td></tr>`).join("")}</table>
       <h2>Step 2 — High risk tasks selected</h2>
       <p>${hrcwList}</p>
-      ${HRCW_TASKS.filter(t=>rd.hrcwSelected?.[t.id]&&t.id!=="hrcw_none"&&t.permits.length>0).map(t=>`<p style="font-size:11px;color:#92400E;margin-top:4px"><strong>${t.label}:</strong> ${t.permits.join(" | ")}</p>`).join("")}
+
       <h2>Step 3 — Hazards identified</h2>
       <p>${hazardList}</p>
       ${rd.liftDetails?.load?`<h2>Lift analysis</h2><table><tr><th>Load</th><th>Weight</th><th>Equipment</th><th>Radius</th></tr><tr><td>${rd.liftDetails.load}</td><td>${rd.liftDetails.weight}t</td><td>${rd.liftDetails.crane}</td><td>${rd.liftDetails.radius}m</td></tr></table>`:""}
