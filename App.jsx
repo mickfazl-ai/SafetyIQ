@@ -45,8 +45,10 @@ const HAZARDS = [
   { id:"h_struct",label:"Structural Instability",  sub:"Unsecured frames, components overhead, inadequate support", weight:"high" },
   { id:"h_env",   label:"Environment / Weather",   sub:"Rain, wind, heat stress, poor lighting, dust",          weight:"medium" },
   { id:"h_traffic",label:"Traffic / Mobile Plant", sub:"Vehicles, forklifts, cranes near work area",            weight:"high" },
-  { id:"h_ergon", label:"Ergonomic / Fatigue",     sub:"Repetitive work, awkward access, shift fatigue",        weight:"medium" },
-  { id:"h_other", label:"Other Hazard",            sub:"Any hazard not captured above",                         weight:"medium" },
+  { id:"h_ergon", label:"Ergonomic / Fatigue",      sub:"Repetitive work, awkward access, shift fatigue",                        weight:"medium" },
+  { id:"h_lift",  label:"Lifting / Rigging / Crane",sub:"Crane lifts, rigging failures, dropped loads, slinging operations",      weight:"high" },
+  { id:"h_elec",  label:"Electrical Shock",         sub:"Contact with live conductors, faulty equipment, switchboards",           weight:"high" },
+  { id:"h_other", label:"Other Hazard",             sub:"Any hazard not captured above",                                          weight:"medium" },
 ];
 
 // Pre-populated hazard descriptions for SWMS auto-fill
@@ -62,6 +64,8 @@ const HAZARD_SUGGESTIONS = {
   h_env:   { hazard:"Environment / Weather — rain, wind, heat stress, poor lighting, dust affecting work conditions", initialL:"2", initialC:"1" },
   h_traffic:{ hazard:"Traffic / Mobile Plant — vehicles, forklifts or cranes operating near the work area", initialL:"2", initialC:"3" },
   h_ergon: { hazard:"Ergonomic / Fatigue — repetitive tasks, awkward access positions, end-of-shift fatigue", initialL:"3", initialC:"1" },
+  h_lift:  { hazard:"Lifting / Rigging / Crane — crane lifts, rigging failures, dropped loads, slinging operations", initialL:"1", initialC:"4" },
+  h_elec:  { hazard:"Electrical Shock — contact with live conductors, faulty equipment or switchboards", initialL:"1", initialC:"4" },
   h_other: { hazard:"Other Hazard — ", initialL:"", initialC:"" },
 };
 
@@ -996,6 +1000,26 @@ const SUGGESTED_CONTROLS = {
     "Take regular breaks during physically demanding tasks",
     "Adjust work height to reduce bending/stretching",
     "Report fatigue to supervisor — do not work impaired",
+  ],
+  h_lift: [
+    "Ensure Lift Plan / Rigging Study is completed and approved before lift",
+    "Confirm load weight and verify it is within crane/equipment SWL",
+    "Inspect all rigging equipment — slings, shackles, hooks — before use",
+    "Establish and sign exclusion zone — no persons under suspended load",
+    "Ensure dogman/rigger holds current and relevant licence",
+    "Use tag lines to control load swing — never use hands",
+    "Communicate lift plan to all involved via pre-start/toolbox talk",
+    "Check overhead obstructions and ground conditions before lift",
+  ],
+  h_elec: [
+    "Isolate and lock out electrical supply before commencing work (LOTO)",
+    "Test for dead using approved voltage tester before touching conductors",
+    "Only licensed electricians to perform electrical work",
+    "Use insulated tools rated for the voltage involved",
+    "Keep water and conductive materials away from electrical equipment",
+    "Wear appropriate PPE — insulated gloves, safety glasses",
+    "Inspect leads, tools and equipment for damage before use",
+    "Do not work alone on live electrical tasks",
   ],
 };
 
