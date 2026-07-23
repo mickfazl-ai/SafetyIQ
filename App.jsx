@@ -35,20 +35,23 @@ const HRCW_TASKS = [
 ];
 
 const HAZARDS = [
-  { id:"h_mh",    label:"Manual Handling",        sub:"Heavy lifts, awkward postures, repetitive strain",      weight:"medium" },
-  { id:"h_fall",  label:"Falls / Slips / Trips",  sub:"Wet surfaces, uneven ground, open edges, debris",       weight:"high" },
-  { id:"h_mech",  label:"Mechanical Hazards",      sub:"Rotating parts, nip points, struck by components",      weight:"high" },
-  { id:"h_press", label:"Pressure / Stored Energy",sub:"Hydraulic/pneumatic energy, springs, accumulators",     weight:"high" },
-  { id:"h_chem",  label:"Chemical / Substance",    sub:"Hydraulic oil, grease, solvents, cleaning agents",      weight:"medium" },
-  { id:"h_noise", label:"Noise / Vibration",       sub:"Impact tools, grinders, heavy machinery",               weight:"medium" },
-  { id:"h_heat",  label:"Heat / Burns",            sub:"Hot surfaces, steam, friction, welding",                weight:"medium" },
-  { id:"h_struct",label:"Structural Instability",  sub:"Unsecured frames, components overhead, inadequate support", weight:"high" },
-  { id:"h_env",   label:"Environment / Weather",   sub:"Rain, wind, heat stress, poor lighting, dust",          weight:"medium" },
-  { id:"h_traffic",label:"Traffic / Mobile Plant", sub:"Vehicles, forklifts, cranes near work area",            weight:"high" },
-  { id:"h_ergon", label:"Ergonomic / Fatigue",      sub:"Repetitive work, awkward access, shift fatigue",                        weight:"medium" },
-  { id:"h_lift",  label:"Lifting / Rigging / Crane",sub:"Crane lifts, rigging failures, dropped loads, slinging operations",      weight:"high" },
-  { id:"h_elec",  label:"Electrical Shock",         sub:"Contact with live conductors, faulty equipment, switchboards",           weight:"high" },
-  { id:"h_other", label:"Other Hazard",             sub:"Any hazard not captured above",                                          weight:"medium" },
+  { id:"h_mh",     icon:"💪", label:"Manual Handling",          sub:"Heavy lifts, awkward postures, repetitive strain",                   weight:"medium" },
+  { id:"h_fall",   icon:"⬇️", label:"Falls / Slips / Trips",    sub:"Wet surfaces, uneven ground, open edges, debris",                   weight:"high" },
+  { id:"h_mech",   icon:"⚙️", label:"Mechanical Hazards",        sub:"Rotating parts, nip points, struck by components",                  weight:"high" },
+  { id:"h_press",  icon:"🔴", label:"Pressure / Stored Energy",  sub:"Hydraulic/pneumatic energy, springs, accumulators",                 weight:"high" },
+  { id:"h_chem",   icon:"🧪", label:"Chemical / Substance",      sub:"Hydraulic oil, grease, solvents, cleaning agents",                  weight:"medium" },
+  { id:"h_noise",  icon:"🔊", label:"Noise / Vibration",         sub:"Impact tools, grinders, heavy machinery",                           weight:"medium" },
+  { id:"h_heat",   icon:"🌡️", label:"Heat / Burns",              sub:"Hot surfaces, steam, friction, welding",                            weight:"medium" },
+  { id:"h_struct", icon:"🏚️", label:"Structural Instability",    sub:"Unsecured frames, components overhead, inadequate support",          weight:"high" },
+  { id:"h_env",    icon:"🌧️", label:"Environment / Weather",     sub:"Rain, wind, heat stress, poor lighting, dust",                      weight:"medium" },
+  { id:"h_traffic",icon:"🚛", label:"Traffic / Mobile Plant",    sub:"Vehicles, forklifts, cranes near work area",                        weight:"high" },
+  { id:"h_ergon",  icon:"🧍", label:"Ergonomic / Fatigue",       sub:"Repetitive work, awkward access, shift fatigue",                    weight:"medium" },
+  { id:"h_lift",   icon:"🏗️", label:"Lifting / Rigging / Crane", sub:"Crane lifts, rigging failures, dropped loads, slinging operations", weight:"high" },
+  { id:"h_elec",   icon:"⚡", label:"Electrical Shock",          sub:"Contact with live conductors, faulty equipment, switchboards",       weight:"high" },
+  { id:"h_wah",    icon:"🪜", label:"Working at Heights",        sub:"Any work above 2m, platforms, ladders, scaffolding",                weight:"high" },
+  { id:"h_cs",     icon:"🚪", label:"Confined Space",            sub:"Enclosed space with restricted egress or atmospheric risk",          weight:"high" },
+  { id:"h_hotwork",icon:"🔥", label:"Hot Works",                 sub:"Welding, cutting, grinding, brazing or any open flame work",        weight:"high" },
+  { id:"h_other",  icon:"⚠️", label:"Other Hazard",              sub:"Any hazard not captured above",                                     weight:"medium" },
 ];
 
 // Pre-populated hazard descriptions for SWMS auto-fill
@@ -65,6 +68,9 @@ const HAZARD_SUGGESTIONS = {
   h_traffic:{ hazard:"Traffic / Mobile Plant — vehicles, forklifts or cranes operating near the work area", initialL:"2", initialC:"3" },
   h_ergon: { hazard:"Ergonomic / Fatigue — repetitive tasks, awkward access positions, end-of-shift fatigue", initialL:"3", initialC:"1" },
   h_lift:  { hazard:"Lifting / Rigging / Crane — crane lifts, rigging failures, dropped loads, slinging operations", initialL:"1", initialC:"4" },
+  h_wah:   { hazard:"Working at Heights — fall risk from platforms, ladders, scaffolding or any work above 2 metres", initialL:"2", initialC:"3" },
+  h_cs:    { hazard:"Confined Space — restricted egress, atmospheric hazards, poor ventilation", initialL:"1", initialC:"4" },
+  h_hotwork:{ hazard:"Hot Works — welding, cutting or grinding with risk of fire, burns or ignition of flammables", initialL:"2", initialC:"2" },
   h_elec:  { hazard:"Electrical Shock — contact with live conductors, faulty equipment or switchboards", initialL:"1", initialC:"4" },
   h_other: { hazard:"Other Hazard — ", initialL:"", initialC:"" },
 };
@@ -896,9 +902,9 @@ function RecordsView({ records, companyName, showCompany, onExportAll, onExportS
                 <div style={{ fontSize:15, fontWeight:600 }}>{r.task||rd.task||r.job_ref||"Untitled task"}</div>
                 <div style={{ fontSize:13, color:"#6B7280", marginTop:2 }}>{r.location||rd.location||"No location"}{showCompany&&r.company_id?" · "+companies_cache[r.company_id]:""}</div>
                 <div style={{ fontSize:12, color:"#9CA3AF" }}>{r.created_at?.slice(0,10)} {r.created_at?.slice(11,16)}</div>
-                {rd.hrcwSelected && Object.keys(rd.hrcwSelected).filter(k=>rd.hrcwSelected[k]&&k!=="hrcw_none").length>0 && (
+                {(rd.hazards||[]).length>0 && (
                   <div style={{ fontSize:11, color:"#7C3AED", marginTop:3 }}>
-                    {HRCW_TASKS.filter(t=>rd.hrcwSelected[t.id]&&t.id!=="hrcw_none").map(t=>t.label).join(" · ")}
+                    {(rd.hazards||[]).map(id=>HAZARDS.find(h=>h.id===id)?.label||id).join(" · ")}
                   </div>
                 )}
               </div>
@@ -1021,6 +1027,33 @@ const SUGGESTED_CONTROLS = {
     "Inspect leads, tools and equipment for damage before use",
     "Do not work alone on live electrical tasks",
   ],
+  h_wah: [
+    "Use fall arrest system / harness when working above 2 metres",
+    "Inspect all height safety equipment before use",
+    "Complete EWP / elevated platform pre-start inspection",
+    "Ensure platform is on stable, level ground",
+    "Maintain three points of contact on ladders at all times",
+    "Establish exclusion zone below work at heights area",
+    "Never overreach — reposition ladder/platform instead",
+  ],
+  h_cs: [
+    "Obtain Confined Space Entry Permit before entry",
+    "Test atmosphere — O₂ 19.5–23.5%, LEL <10%, CO <25ppm",
+    "Assign standby person at entry point at all times",
+    "Ensure rescue equipment is available and workers trained",
+    "Provide forced air ventilation if required",
+    "Isolate all energy sources before entry",
+    "Continuous atmospheric monitoring during task",
+  ],
+  h_hotwork: [
+    "Obtain Hot Work Permit before commencing",
+    "Clear area of all flammable/combustible materials within 10m",
+    "Have serviceable fire extinguisher within arm's reach",
+    "Assign fire watch — must remain for 30 minutes after completion",
+    "Protect surfaces with fire blankets where needed",
+    "Ensure adequate ventilation to remove fumes",
+    "Check for hidden combustibles behind walls/surfaces",
+  ],
 };
 
 function SuggestedControls({ hazardId, onAdd }) {
@@ -1052,7 +1085,6 @@ function Take5App({ company, onExit, onForgetDevice }) {
   const [screen, setScreen] = useState("setup");
   const [form, setForm] = useState({ jobRef:"", location:"", date:new Date().toISOString().slice(0,10), time:new Date().toTimeString().slice(0,5), task:"", machine:"" });
   const [step1, setStep1] = useState({});
-  const [hrcw, setHrcw] = useState({});
   const [hazards, setHazards] = useState({});
   const [liftChecks, setLiftChecks] = useState({});
   const [liftDetails, setLiftDetails] = useState({ load:"", weight:"", crane:"", radius:"" });
@@ -1202,103 +1234,15 @@ function Take5App({ company, onExit, onForgetDevice }) {
           );
         })}
       </div>
-      <button style={{...S.btnPrim,opacity:step1Done()?1:.4}} disabled={!step1Done()} onClick={()=>setScreen("step2")}>Select high risk tasks →</button>
+      <button style={{...S.btnPrim,opacity:step1Done()?1:.4}} disabled={!step1Done()} onClick={()=>setScreen("step3")}>Identify hazards →</button>
       <button style={{...S.btnSec,width:"100%",textAlign:"center",marginTop:8}} onClick={()=>setScreen("setup")}>← Back</button>
     </div>
   );
 
-  if (screen==="step2") return (
+
+  if (screen==="confined")  if (screen==="confined") return (
     <div style={S.app}>
       {hdr}<Pips active={2} />
-      <div style={S.stepLbl}>Step 2 — High risk construction work</div>
-      <div style={S.secSub}>Select <strong>all</strong> high risk tasks that apply to this job.</div>
-      <div style={{ display:"flex", flexDirection:"column", gap:8, marginBottom:10 }}>
-        {HRCW_TASKS.map(t=>{
-          const on = hrcw[t.id];
-          const isNone = t.id==="hrcw_none";
-          return (
-            <button key={t.id} onClick={()=>{ if(isNone) setHrcw({hrcw_none:!hrcw.hrcw_none}); else setHrcw(p=>({...p,hrcw_none:false,[t.id]:!p[t.id]})); }}
-              style={{ border:"2px solid", borderRadius:12, padding:"14px", textAlign:"left", cursor:"pointer",
-                background:on?(isNone?"#F0FDF4":"#FEF2F2"):"#fff",
-                borderColor:on?(isNone?"#86EFAC":"#EF4444"):"#E5E7EB" }}>
-              <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                <span style={{fontSize:24}}>{t.icon}</span>
-                <div style={{flex:1}}>
-                  <div style={{fontSize:15,fontWeight:700,color:on?(isNone?"#15803D":"#B91C1C"):"#1F2937"}}>{t.label}</div>
-                  <div style={{fontSize:12,color:on?(isNone?"#166534":"#EF4444"):"#9CA3AF",marginTop:2,lineHeight:1.4}}>{t.sub}</div>
-                </div>
-                <div style={{width:24,height:24,borderRadius:6,border:"2px solid",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,
-                  background:on?(isNone?"#22C55E":"#EF4444"):"#fff",borderColor:on?(isNone?"#22C55E":"#EF4444"):"#D1D5DB"}}>
-                  {on&&<span style={{color:"#fff",fontSize:14,fontWeight:700}}>✓</span>}
-                </div>
-              </div>
-              {on&&!isNone&&t.permits.length>0&&(
-                <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid #FEE2E2"}}>
-                  {t.permits.map((p,i)=><div key={i} style={{fontSize:12,color:"#B91C1C",display:"flex",gap:6,marginBottom:3}}><span>⚠</span><span>{p}</span></div>)}
-                </div>
-              )}
-            </button>
-          );
-        })}
-      </div>
-      {selectedHrcw.length>0&&(
-        <div style={{padding:"12px 14px",borderRadius:10,background:"#FEF2F2",border:"1px solid #FCA5A5",marginBottom:10}}>
-          <div style={{fontSize:13,fontWeight:700,color:"#B91C1C",marginBottom:4}}>SWMS required</div>
-          <div style={{fontSize:12,color:"#991B1B"}}>{selectedHrcw.map(t=>t.label).join(" · ")}</div>
-        </div>
-      )}
-      <button style={{...S.btnPrim,opacity:anyHrcw?1:.4}} disabled={!anyHrcw}
-        onClick={()=>setScreen(hrcw.hrcw_none?"step3":getNextAfterHrcw())}>
-        {hrcw.hrcw_none?"Continue to hazard identification →":needsLift?"Complete lift risk analysis →":needsCS?"Confined space checklist →":"Continue →"}
-      </button>
-      <button style={{...S.btnSec,width:"100%",textAlign:"center",marginTop:8}} onClick={()=>setScreen("step1")}>← Back</button>
-    </div>
-  );
-
-  if (screen==="lift") return (
-    <div style={S.app}>
-      {hdr}<Pips active={3} />
-      <div style={S.stepLbl}>Lift risk analysis</div>
-      <div style={S.secSub}>Complete all items before any lifting operation.</div>
-      <div style={S.card}>
-        {LIFT_CHECKS.map((lc,i)=>{
-          const ans=liftChecks[i];
-          return (
-            <div key={i} style={{padding:"12px 0",borderBottom:"1px solid #F3F4F6"}}>
-              <div style={{fontSize:15,color:"#1F2937",lineHeight:1.5,marginBottom:8}}>{lc}</div>
-              <div style={{display:"flex",gap:8}}>
-                {["yes","no","na"].map(v=>(
-                  <button key={v} onClick={()=>setLiftChecks(p=>({...p,[i]:v}))}
-                    style={{flex:1,padding:"11px",borderRadius:10,border:"2px solid",fontSize:14,fontWeight:700,cursor:"pointer",
-                      background:ans===v?(v==="no"?"#FEE2E2":v==="yes"?"#D1FAE5":"#EFF6FF"):"#F9FAFB",
-                      color:ans===v?(v==="no"?"#B91C1C":v==="yes"?"#065F46":"#2563EB"):"#6B7280",
-                      borderColor:ans===v?(v==="no"?"#FCA5A5":v==="yes"?"#86EFAC":"#93C5FD"):"#E5E7EB"}}>
-                    {v.toUpperCase()}
-                  </button>
-                ))}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      <div style={{...S.card,background:"#F5F3FF",border:"2px solid #DDD6FE"}}>
-        <div style={{fontSize:14,fontWeight:700,color:"#7C3AED",marginBottom:10}}>Load details</div>
-        <div><label style={S.label}>Load description</label><input style={S.input} value={liftDetails.load} onChange={e=>setLiftDetails(p=>({...p,load:e.target.value}))} placeholder="e.g. TBM thrust cylinder assembly" /></div>
-        <div style={S.grid2}>
-          <div><label style={S.label}>Weight (t)</label><input style={S.input} type="number" value={liftDetails.weight} onChange={e=>setLiftDetails(p=>({...p,weight:e.target.value}))} placeholder="2.5" /></div>
-          <div><label style={S.label}>Radius (m)</label><input style={S.input} type="number" value={liftDetails.radius} onChange={e=>setLiftDetails(p=>({...p,radius:e.target.value}))} placeholder="4" /></div>
-        </div>
-        <div style={{marginTop:10}}><label style={S.label}>Crane / equipment</label><input style={S.input} value={liftDetails.crane} onChange={e=>setLiftDetails(p=>({...p,crane:e.target.value}))} placeholder="e.g. 20t overhead gantry" /></div>
-      </div>
-      {Object.values(liftChecks).some(v=>v==="no")&&<div style={{borderRadius:12,padding:"12px 14px",background:"#FEF2F2",border:"2px solid #FCA5A5",marginBottom:10,fontSize:14,color:"#B91C1C",fontWeight:700}}>✕ Lift must not proceed — resolve all "No" items first.</div>}
-      <button style={S.btnPrim} onClick={()=>setScreen(getNextAfterLift())}>Continue →</button>
-      <button style={{...S.btnSec,width:"100%",textAlign:"center",marginTop:8}} onClick={()=>setScreen("step2")}>← Back</button>
-    </div>
-  );
-
-  if (screen==="confined") return (
-    <div style={S.app}>
-      {hdr}<Pips active={3} />
       <div style={S.stepLbl}>Confined space pre-entry checklist</div>
       <div style={S.secSub}>All items must be confirmed before any person enters the confined space.</div>
       <div style={S.card}>
@@ -1324,7 +1268,7 @@ function Take5App({ company, onExit, onForgetDevice }) {
       </div>
       {Object.values(csChecks).some(v=>v==="no")&&<div style={{borderRadius:12,padding:"12px 14px",background:"#FEF2F2",border:"2px solid #FCA5A5",marginBottom:10,fontSize:14,color:"#B91C1C",fontWeight:700}}>✕ Entry must not proceed — resolve all "No" items first.</div>}
       <button style={S.btnPrim} onClick={()=>setScreen("step3")}>Continue to hazard identification →</button>
-      <button style={{...S.btnSec,width:"100%",textAlign:"center",marginTop:8}} onClick={()=>setScreen(needsLift?"lift":"step2")}>← Back</button>
+      <button style={{...S.btnSec,width:"100%",textAlign:"center",marginTop:8}} onClick={()=>setScreen("step1")}>← Back</button>
     </div>
   );
 
@@ -1337,10 +1281,13 @@ function Take5App({ company, onExit, onForgetDevice }) {
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
           {HAZARDS.map(h=>(
             <button key={h.id} onClick={()=>setHazards(p=>({...p,[h.id]:!p[h.id]}))}
-              style={{border:"2px solid",borderRadius:10,padding:"12px 10px",textAlign:"left",cursor:"pointer",lineHeight:1.3,minHeight:64,
+              style={{border:"2px solid",borderRadius:10,padding:"10px",textAlign:"left",cursor:"pointer",lineHeight:1.3,minHeight:64,
                 background:hazards[h.id]?"#FEF2F2":"#F9FAFB",borderColor:hazards[h.id]?"#EF4444":"#E5E7EB"}}>
-              <div style={{fontSize:14,fontWeight:h.weight==="high"?700:500,color:hazards[h.id]?"#B91C1C":"#374151"}}>{h.label}</div>
-              <div style={{fontSize:11,color:hazards[h.id]?"#EF4444":"#9CA3AF",marginTop:3,lineHeight:1.3}}>{h.sub}</div>
+              <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:3}}>
+                <span style={{fontSize:18,flexShrink:0}}>{h.icon}</span>
+                <div style={{fontSize:13,fontWeight:h.weight==="high"?700:500,color:hazards[h.id]?"#B91C1C":"#374151",lineHeight:1.2}}>{h.label}</div>
+              </div>
+              <div style={{fontSize:11,color:hazards[h.id]?"#EF4444":"#9CA3AF",lineHeight:1.3,paddingLeft:24}}>{h.sub}</div>
             </button>
           ))}
         </div>
@@ -1354,7 +1301,6 @@ function Take5App({ company, onExit, onForgetDevice }) {
       </div>
       {result==="swms"
         ?<button style={S.btnPrim} onClick={()=>{
-            // Auto-populate SWMS rows from selected hazards
             const haz = Object.keys(hazards).filter(k=>hazards[k]);
             if (haz.length > 0) {
               const rows = haz.map((id,i) => {
@@ -1373,10 +1319,10 @@ function Take5App({ company, onExit, onForgetDevice }) {
               });
               setSwmsRows(rows);
             }
-            setScreen("swms");
+            setScreen(needsCS ? "confined" : "swms");
           }}>Complete SWMS →</button>
         :<button style={S.btnPrim} onClick={()=>setScreen("complete")}>Sign off →</button>}
-      <button style={{...S.btnSec,width:"100%",textAlign:"center",marginTop:8}} onClick={()=>setScreen(needsCS?"confined":needsLift?"lift":"step2")}>← Back</button>
+      <button style={{...S.btnSec,width:"100%",textAlign:"center",marginTop:8}} onClick={()=>setScreen(needsCS?"confined":"step1")}>← Back</button>
     </div>
   );
 
@@ -1392,14 +1338,15 @@ function Take5App({ company, onExit, onForgetDevice }) {
           <div><label style={S.label}>Date</label><input style={S.input} type="date" value={form.date} onChange={setF("date")} /></div>
         </div>
       </div>
-      {selectedHrcw.length>0&&(
+      {/* Permit requirements based on selected hazards */}
+      {(hazards.h_wah||hazards.h_cs||hazards.h_lift||hazards.h_elec||hazards.h_hotwork) && (
         <div style={{...S.card,background:"#FFF7ED",border:"1px solid #FED7AA"}}>
-          <div style={{fontSize:13,fontWeight:700,color:"#92400E",marginBottom:8}}>⚠ Permit requirements</div>
-          {selectedHrcw.map(t=>t.permits.map((p,i)=>(
-            <div key={t.id+i} style={{fontSize:13,color:"#92400E",padding:"4px 0",borderBottom:"1px solid #FED7AA",display:"flex",gap:8}}>
-              <span>•</span><span><strong>{t.label}:</strong> {p}</span>
-            </div>
-          )))}
+          <div style={{fontSize:13,fontWeight:700,color:"#92400E",marginBottom:8}}>⚠ Permit requirements for selected hazards</div>
+          {hazards.h_wah && <div style={{fontSize:13,color:"#92400E",padding:"4px 0",borderBottom:"1px solid #FED7AA",display:"flex",gap:8}}><span>•</span><span><strong>Working at Heights:</strong> Height Safety Plan / EWP pre-start must be completed</span></div>}
+          {hazards.h_cs && <div style={{fontSize:13,color:"#92400E",padding:"4px 0",borderBottom:"1px solid #FED7AA",display:"flex",gap:8}}><span>•</span><span><strong>Confined Space:</strong> Entry Permit required + atmospheric testing O₂, CO, LEL</span></div>}
+          {hazards.h_lift && <div style={{fontSize:13,color:"#92400E",padding:"4px 0",borderBottom:"1px solid #FED7AA",display:"flex",gap:8}}><span>•</span><span><strong>Lifting Operations:</strong> Lift Plan / Rigging Study required + dogman/rigger tickets current</span></div>}
+          {hazards.h_elec && <div style={{fontSize:13,color:"#92400E",padding:"4px 0",borderBottom:"1px solid #FED7AA",display:"flex",gap:8}}><span>•</span><span><strong>Electrical Works:</strong> Electrical Isolation Permit required + licensed electrician only</span></div>}
+          {hazards.h_hotwork && <div style={{fontSize:13,color:"#92400E",padding:"4px 0",display:"flex",gap:8}}><span>•</span><span><strong>Hot Works:</strong> Hot Work Permit required + fire extinguisher on hand + 30-min fire watch</span></div>}
         </div>
       )}
       {swmsRows.map((h,i)=>{
