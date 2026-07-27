@@ -1086,8 +1086,6 @@ function Take5App({ company, onExit, onForgetDevice }) {
   const [form, setForm] = useState({ jobRef:"", location:"", date:new Date().toISOString().slice(0,10), time:new Date().toTimeString().slice(0,5), task:"", machine:"" });
   const [step1, setStep1] = useState({});
   const [hazards, setHazards] = useState({});
-  const [liftChecks, setLiftChecks] = useState({});
-  const [liftDetails, setLiftDetails] = useState({ load:"", weight:"", crane:"", radius:"" });
   const [csChecks, setCsChecks] = useState({});
   const [swmsRows, setSwmsRows] = useState([{ id:1, hazard:"", initialL:"", initialC:"", controls:"", responsible:"", residualL:"", residualC:"" }]);
   const [sigWorker, setSigWorker] = useState("");
@@ -1126,7 +1124,7 @@ function Take5App({ company, onExit, onForgetDevice }) {
       job_ref:form.jobRef, task:form.task, location:form.location,
       company_id:company.company_id, result,
       created_at:form.date+"T"+form.time,
-      record_data:{ ...form, step1, hrcwSelected:hrcw, hazards:Object.keys(hazards).filter(k=>hazards[k]), liftChecks, liftDetails, csChecks, swmsHazards:swmsRows, sigWorker, sigSupervisor },
+      record_data:{ ...form, step1, hazards:Object.keys(hazards).filter(k=>hazards[k]), csChecks, swmsHazards:swmsRows, sigWorker, sigSupervisor },
     }).select().single();
     if (error) setCloudMsg("Save failed: "+error.message);
     else { setSavedId(data.id); setCloudMsg("Saved ✓"); }
@@ -1134,14 +1132,13 @@ function Take5App({ company, onExit, onForgetDevice }) {
   }
 
   function exportPDF() {
-    const rec = { ...form, step1, hrcwSelected:hrcw, hazards:Object.keys(hazards).filter(k=>hazards[k]), liftChecks, liftDetails, csChecks, swmsHazards:swmsRows, sigWorker, sigSupervisor, result:calcResult() };
+    const rec = { ...form, step1, hazards:Object.keys(hazards).filter(k=>hazards[k]), csChecks, swmsHazards:swmsRows, sigWorker, sigSupervisor, result:calcResult() };
     const w = window.open("","_blank","width=900,height=700");
     if(w){ w.document.write(buildBulkPDF([{record_data:rec,result:rec.result,task:rec.task,location:rec.location,job_ref:rec.jobRef,created_at:rec.date+"T"+rec.time}], company.company_name)); w.document.close(); setTimeout(()=>w.print(),600); }
   }
 
   function reset() {
-    setScreen("setup"); setStep1({}); setHrcw({}); setHazards({}); setLiftChecks({}); setCsChecks({});
-    setLiftDetails({load:"",weight:"",crane:"",radius:""});
+    setScreen("setup"); setStep1({}); setHazards({}); setCsChecks({});
     setSwmsRows([{id:1,hazard:"",initialL:"",initialC:"",controls:"",responsible:"",residualL:"",residualC:""}]);
     setSavedId(null); setCloudMsg(""); setSigWorker(""); setSigSupervisor("");
     setForm({jobRef:"",location:"",date:new Date().toISOString().slice(0,10),time:new Date().toTimeString().slice(0,5),task:"",machine:""});
