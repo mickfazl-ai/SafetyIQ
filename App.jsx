@@ -1403,7 +1403,6 @@ function Take5App({ company, onExit, onForgetDevice }) {
           ["Hazards",selectedHazards.map(h=>h.label).join(", ")||"None"],
           ["SWMS required",result==="swms"?"Yes":"No"],
           result==="swms"&&["Hazards documented",swmsRows.length],
-          needsLift&&["Lift analysis","Completed"],
           needsCS&&["Confined space checklist","Completed"],
         ].filter(Boolean).map(([k,v])=>v?<div key={k} style={{fontSize:14,padding:"5px 0",borderBottom:"1px solid #F3F4F6"}}><strong>{k}:</strong> {v}</div>:null)}
       </div>
