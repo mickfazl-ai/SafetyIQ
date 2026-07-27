@@ -1399,7 +1399,7 @@ function Take5App({ company, onExit, onForgetDevice }) {
       <div style={S.card}>
         <div style={{...S.divider,marginTop:0}}>Summary</div>
         {[["Task",form.task],["Machine",form.machine],["Location",form.location],["Job ref",form.jobRef],
-          ["High risk tasks",selectedHrcw.map(t=>t.label).join(", ")||"None"],
+          ["High risk tasks", Object.keys(hazards).filter(k=>hazards[k]).map(id=>HAZARDS.find(h=>h.id===id)?.label||id).join(", ")||"None"],
           ["Hazards",selectedHazards.map(h=>h.label).join(", ")||"None"],
           ["SWMS required",result==="swms"?"Yes":"No"],
           result==="swms"&&["Hazards documented",swmsRows.length],
